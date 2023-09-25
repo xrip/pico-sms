@@ -64,6 +64,7 @@ target_link_libraries(sms PRIVATE
 
         vga
         sdcard
+        audio
         fatfs
         nespad
 

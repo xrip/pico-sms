@@ -6,7 +6,8 @@
 #include <stdint.h>
 #include <string.h>
 
-#define PSG sms->psg
+extern struct SMS_Core sms;
+#define PSG sms.psg
 
 enum
 {
@@ -26,13 +27,13 @@ enum
 
 #if SMS_DISBALE_AUDIO
 
-void psg_reg_write(struct SMS_Core* sms, const uint8_t value) {}
-void psg_sync(struct SMS_Core* sms) {}
-void psg_run(struct SMS_Core* sms, const uint8_t cycles) {}
+void psg_reg_write(const uint8_t value) {}
+void psg_sync() {}
+void psg_run(const uint8_t cycles) {}
 
 #else
 
-static FORCE_INLINE void latch_reg_write(struct SMS_Core* sms, const uint8_t value)
+static FORCE_INLINE void latch_reg_write(const uint8_t value)
 {
     PSG.latched_channel = (value >> 5) & 0x3;
     PSG.latched_type = (value >> 4) & 0x1;
@@ -61,7 +62,7 @@ static FORCE_INLINE void latch_reg_write(struct SMS_Core* sms, const uint8_t val
     }
 }
 
-static FORCE_INLINE void data_reg_write(struct SMS_Core* sms, const uint8_t value)
+static FORCE_INLINE void data_reg_write(const uint8_t value)
 {
     const uint8_t data = value & 0x3F;
 
@@ -87,22 +88,22 @@ static FORCE_INLINE void data_reg_write(struct SMS_Core* sms, const uint8_t valu
     }
 }
 
-void psg_reg_write(struct SMS_Core* sms, const uint8_t value)
+void psg_reg_write(const uint8_t value)
 {
     psg_sync(sms);
 
     // if MSB is set, then this is a latched write, else its a normal data write
     if (value & 0x80)
     {
-        latch_reg_write(sms, value);
+        latch_reg_write(value);
     }
     else
     {
-        data_reg_write(sms, value);
+        data_reg_write(value);
     }
 }
 
-static FORCE_INLINE void tick_tone(struct SMS_Core* sms, const uint8_t index, const uint8_t cycles)
+static FORCE_INLINE void tick_tone(const uint8_t index, const uint8_t cycles)
 {
     enum { MAX_SAMPLE_RATE = 8 }; // fixes shinobi tone2 (set to less than 8 to hear bug)
 
@@ -142,7 +143,7 @@ static FORCE_INLINE void tick_tone(struct SMS_Core* sms, const uint8_t index, co
     }
 }
 
-static FORCE_INLINE void tick_noise(struct SMS_Core* sms, const uint8_t cycles)
+static FORCE_INLINE void tick_noise(const uint8_t cycles)
 {
     PSG.noise.counter -= cycles;
 
@@ -151,7 +152,7 @@ static FORCE_INLINE void tick_noise(struct SMS_Core* sms, const uint8_t cycles)
         // the drums sound much better in basically every game if
         // the timer is 16, 32, 64.
         // however, the correct sound is at 256, 512, 1024.
-        const uint8_t multi = sms->better_drums ? 1 : 16;
+        const uint8_t multi = sms.better_drums ? 1 : 16;
 
         // the apu runs x16 slower than cpu!
         switch (PSG.noise.shift_rate)
@@ -184,28 +185,29 @@ static FORCE_INLINE void tick_noise(struct SMS_Core* sms, const uint8_t cycles)
     }
 }
 
-static FORCE_INLINE uint8_t sample_channel(struct SMS_Core* sms, const uint8_t index)
+static FORCE_INLINE uint8_t sample_channel(const uint8_t index)
 {
     // the volume is inverted, so that 0xF = OFF, 0x0 = MAX
     return PSG.polarity[index] * (0xF - PSG.volume[index]);
 }
 
-static void sample(struct SMS_Core* sms)
+static void sample(struct SMS_Core sms)
 {
-    if (sms->apu_sample_index >= sms->apu_sample_size)
+    return;
+/*    if (sms.apu_sample_index >= sms.apu_sample_size)
     {
-        sms->apu_callback(sms->userdata, sms->apu_samples, sms->apu_sample_size);
-        sms->apu_sample_index = 0;
+        sms.apu_callback(sms.userdata, sms.apu_samples, sms.apu_sample_size);
+        sms.apu_sample_index = 0;
     }
 
     // generate samples
-    const uint8_t tone0 = sample_channel(sms, 0);
-    const uint8_t tone1 = sample_channel(sms, 1);
-    const uint8_t tone2 = sample_channel(sms, 2);
-    const uint8_t noise = sample_channel(sms, 3);
+    const uint8_t tone0 = sample_channel(0);
+    const uint8_t tone1 = sample_channel(1);
+    const uint8_t tone2 = sample_channel(2);
+    const uint8_t noise = sample_channel(3);
 
     // apply stereo
-    struct SMS_ApuSample* sample = &sms->apu_samples[sms->apu_sample_index];
+    struct SMS_ApuSample* sample = &sms.apu_samples[sms.apu_sample_index];
     sample->tone0[0] = tone0 * PSG.channel_enable[0][0];
     sample->tone0[1] = tone0 * PSG.channel_enable[0][1];
     sample->tone1[0] = tone1 * PSG.channel_enable[1][0];
@@ -216,7 +218,7 @@ static void sample(struct SMS_Core* sms)
     sample->noise[1] = noise * PSG.channel_enable[3][1];
 
     // next!
-    sms->apu_sample_index++;
+    sms.apu_sample_index++;*/
 }
 
 static int16_t scale_psg_u8_to_s16(uint8_t input)
@@ -226,6 +228,8 @@ static int16_t scale_psg_u8_to_s16(uint8_t input)
 
 void SMS_apu_mixer_s16(const struct SMS_ApuSample* samples, int16_t* output, uint32_t count)
 {
+    return;
+    /*
     int16_t tone0;
     int16_t tone1;
     int16_t tone2;
@@ -247,14 +251,15 @@ void SMS_apu_mixer_s16(const struct SMS_ApuSample* samples, int16_t* output, uin
         noise = scale_psg_u8_to_s16(samples[i].noise[1]);
         *output++ = (tone0 + tone1 + tone2 + noise) / 4;
     }
+     */
 }
 
 // this is called on psg_reg_write() and at the end of a frame
-void psg_sync(struct SMS_Core* sms)
+void psg_sync()
 {
     // psg regs cannot be read, so no point ticking stuff
     // if we don't have callback for samples to be pushed
-    if (!sms->apu_callback)
+    if (!sms.apu_callback)
     {
         return;
     }
@@ -266,29 +271,29 @@ void psg_sync(struct SMS_Core* sms)
     // this loop will *not* cause PSG.cycles to underflow!
     for (; STEP <= PSG.cycles; PSG.cycles -= STEP)
     {
-        tick_tone(sms, 0, STEP);
-        tick_tone(sms, 1, STEP);
-        tick_tone(sms, 2, STEP);
-        tick_noise(sms, STEP);
+        tick_tone(0, STEP);
+        tick_tone(1, STEP);
+        tick_tone(2, STEP);
+        tick_noise(STEP);
 
-        sms->apu_callback_counter += STEP;
+        sms.apu_callback_counter += STEP;
 
-        while (sms->apu_callback_counter >= sms->apu_callback_freq)
+        while (sms.apu_callback_counter >= sms.apu_callback_freq)
         {
-            sms->apu_callback_counter -= sms->apu_callback_freq;
+            sms.apu_callback_counter -= sms.apu_callback_freq;
             sample(sms);
         }
     }
 }
 
-void psg_run(struct SMS_Core* sms, const uint8_t cycles)
+void psg_run(const uint8_t cycles)
 {
     PSG.cycles += cycles; // PSG.cycles is an uint32_t, so it won't overflow
 }
 
 #endif // SMS_DISBALE_AUDIO
 
-void psg_init(struct SMS_Core* sms)
+void psg_init()
 {
     // by default, all channels are enabled in GG mode.
     // as sms is mono, these values will not be changed elsewhere

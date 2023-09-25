@@ -9,11 +9,11 @@ extern "C" {
 #endif
 
 #ifndef SMS_DEBUG
-    #define SMS_DEBUG 0
+#define SMS_DEBUG 0
 #endif
 
 #ifndef SMS_SINGLE_FILE
-    #define SMS_SINGLE_FILE 0
+#define SMS_SINGLE_FILE 0
 #endif
 
 
@@ -24,13 +24,13 @@ extern "C" {
 
 // fwd
 struct SMS_Ports;
-struct SMS_ApuSample;
+struct SMS_ApuCallbackData;
 struct SMS_MemoryControlRegister;
 struct SMS_Core;
 
 
 // callback types
-typedef void (*sms_apu_callback_t)(void* user, struct SMS_ApuSample* samples, uint32_t size);
+typedef void (*sms_apu_callback_t)(void* user, struct SMS_ApuCallbackData* data);
 typedef void (*sms_vblank_callback_t)(void* user);
 typedef uint32_t (*sms_colour_callback_t)(void* user, uint8_t r, uint8_t g, uint8_t b);
 
@@ -81,14 +81,14 @@ struct Z80_GeneralRegisterSet
 
     struct
     {
-        bool C : 1;
-        bool N : 1;
-        bool P : 1;
-        bool B3 : 1; // bit3
-        bool H : 1;
-        bool B5 : 1; // bit5
-        bool Z : 1;
-        bool S : 1;
+        bool C;
+        bool N;
+        bool P;
+        bool B3; // bit3
+        bool H;
+        bool B5; // bit5
+        bool Z;
+        bool S;
     } flags;
 };
 
@@ -116,12 +116,12 @@ struct Z80
     struct Z80_GeneralRegisterSet alt;
 
     // interrupt flipflops
-    bool IFF1 : 1;
-    bool IFF2 : 1;
-    bool ei_delay : 1; // like the gb, ei is delayed by 1 instructions
-    bool halt : 1;
+    bool IFF1;
+    bool IFF2;
+    bool ei_delay; // like the gb, ei is delayed by 1 instructions
+    bool halt;
 
-    bool interrupt_requested : 1;
+    bool interrupt_requested;
 };
 
 enum SMS_MapperType
@@ -174,7 +174,8 @@ struct SMS_Cart
     } mappers;
 
     // some games have 8-16-32KiB ram
-    uint8_t ram[2][1024 * 16];
+    //uint8_t ram[2][1024 * 16];
+    uint8_t *ram[2];
 
     uint8_t max_bank_mask;
     bool sram_used; // set when game uses sram at any point
@@ -200,12 +201,12 @@ enum VDP_Code
 
 struct CachedTile
 {
-    uint16_t palette_index : 9;
-    bool priority : 1;
-    bool palette_select : 1;
-    bool vertical_flip : 1;
-    bool horizontal_flip : 1;
-    bool dirty : 1;
+    uint16_t palette_index;
+    bool priority;
+    bool palette_select;
+    bool vertical_flip;
+    bool horizontal_flip;
+    bool dirty;
 };
 
 // basically packed u32, easier for me to understand
@@ -274,17 +275,17 @@ struct SMS_Vdp
     uint16_t control_word;
 
     // set if already have lo byte
-    bool control_latch : 1;
+    bool control_latch;
 
     // (all of below is cleared upon reading stat)
     // set on vblank
-    bool frame_interrupt_pending : 1;
+    bool frame_interrupt_pending;
     // set on line counter underflow
-    bool line_interrupt_pending : 1;
+    bool line_interrupt_pending;
     // set when there's more than 8(sms)/4(sg) sprites on a line
-    bool sprite_overflow : 1;
+    bool sprite_overflow;
     // set when a sprite collides
-    bool sprite_collision : 1;
+    bool sprite_collision;
     // 5th sprite number sg-1000
     uint8_t fifth_sprite_num : 5;
 };
@@ -337,17 +338,18 @@ struct SMS_Ports
     uint8_t b;
 };
 
-struct SMS_ApuSample
+struct SMS_ApuCallbackData
 {
-    uint8_t tone0[2];
-    uint8_t tone1[2];
-    uint8_t tone2[2];
-    uint8_t noise[2];
+    uint8_t tone0;
+    uint8_t tone1;
+    uint8_t tone2;
+    uint8_t noise;
+    uint32_t count;
 };
 
 struct SMS_Psg
 {
-    uint32_t cycles; // elapsed cycles since last psg_sync()
+    uint_fast32_t cycles; // elapsed cycles since last psg_sync()
 
     struct
     {
@@ -378,12 +380,12 @@ struct SMS_Psg
 
 struct SMS_MemoryControlRegister
 {
-    bool exp_slot_disable : 1;
-    bool cart_slot_disable : 1;
-    bool card_slot_disable : 1;
-    bool work_ram_disable : 1;
-    bool bios_rom_disable : 1;
-    bool io_chip_disable : 1;
+    bool exp_slot_disable;
+    bool cart_slot_disable;
+    bool card_slot_disable;
+    bool work_ram_disable;
+    bool bios_rom_disable;
+    bool io_chip_disable;
 };
 
 struct SMS_Core
@@ -421,11 +423,8 @@ struct SMS_Core
     sms_apu_callback_t apu_callback;
     void* userdata;
 
-    struct SMS_ApuSample* apu_samples; // sample buffer
-    uint32_t apu_sample_size; // number of samples
-    uint32_t apu_sample_index; // index into the buffer
-    uint32_t apu_callback_freq; // sample rate
-    uint32_t apu_callback_counter; // how many cpu cycles until sample
+    uint32_t apu_callback_freq;
+    uint32_t apu_callback_counter;
 
     // enable to have better sounding drums in most games!
     bool better_drums;

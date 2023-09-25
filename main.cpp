@@ -19,8 +19,7 @@
 #include "f_util.h"
 #include "ff.h"
 #include "VGA_ROM_F16.h"
-
-#include "rom.h"
+#include "audio.h"
 
 /*
 #define ROM Sonic_The_Hedgehog__USA__Europe__sms
@@ -32,7 +31,7 @@ const uint8_t *rom = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET);
 unsigned int rom_size = 0;
 static FATFS fs;
 
-static struct SMS_Core sms = { 0 };
+struct SMS_Core sms;
 static const sVmode *vmode = nullptr;
 struct semaphore vga_start_semaphore;
 
@@ -285,11 +284,11 @@ void __time_critical_func(render_loop)() {
                 }
                 break;
             case RESOLUTION_NATIVE:
-                if (y < SMS_SCREEN_HEIGHT * 2) {
+                if (y > 48 && y < (48 + SMS_SCREEN_HEIGHT * 2)) {
                     for (int x = 0; x < SMS_SCREEN_WIDTH * 2; x += 2)
-                        (uint16_t &) linebuf->line[64 + x] = X2(SCREEN[(y / 2) * SMS_SCREEN_WIDTH + (x / 2)]);
+                        (uint16_t &) linebuf->line[64 + x] = X2(SCREEN[((y-48) / 2) * SMS_SCREEN_WIDTH + (x / 2)]);
                 } else {
-                    //memset(linebuf->line, 0, SMS_SCREEN_HEIGHT*4);
+                    memset(&linebuf->line, 0, 640);
                 }
         }
     }
@@ -300,7 +299,7 @@ void __time_critical_func(render_loop)() {
 __attribute__((always_inline)) inline uint32_t core_colour_callback(void *user, uint8_t r, uint8_t g, uint8_t b) {
     (void) user;
 
-    if (SMS_get_system_type(&sms) == SMS_System_GG) {
+    if (SMS_get_system_type() == SMS_System_GG) {
         r <<= 4;
         g <<= 4;
         b <<= 4;
@@ -331,15 +330,17 @@ static void handle_input() {
     nespad_read();
 
 
-    SMS_set_port_a(&sms, JOY1_DOWN_BUTTON, (nespad_state & 0x20) != 0);
-    SMS_set_port_a(&sms, JOY1_UP_BUTTON, (nespad_state & 0x10) != 0);
-    SMS_set_port_a(&sms, JOY1_LEFT_BUTTON, (nespad_state & 0x40) != 0);
-    SMS_set_port_a(&sms, JOY1_RIGHT_BUTTON,  (nespad_state & 0x80) != 0);
-    SMS_set_port_a(&sms, JOY1_A_BUTTON, (nespad_state & 0x01) != 0);
-    SMS_set_port_a(&sms, JOY1_B_BUTTON, (nespad_state & 0x02) != 0);
-    SMS_set_port_b(&sms, RESET_BUTTON, (nespad_state & 0x04) != 0);
-    SMS_set_port_b(&sms, PAUSE_BUTTON, (nespad_state & 0x08) != 0);
+    SMS_set_port_a(JOY1_DOWN_BUTTON, (nespad_state & 0x20) != 0);
+    SMS_set_port_a(JOY1_UP_BUTTON, (nespad_state & 0x10) != 0);
+    SMS_set_port_a(JOY1_LEFT_BUTTON, (nespad_state & 0x40) != 0);
+    SMS_set_port_a(JOY1_RIGHT_BUTTON,  (nespad_state & 0x80) != 0);
+    SMS_set_port_a(JOY1_A_BUTTON, (nespad_state & 0x01) != 0);
+    SMS_set_port_a(JOY1_B_BUTTON, (nespad_state & 0x02) != 0);
+    SMS_set_port_b(RESET_BUTTON, (nespad_state & 0x04) != 0);
+    SMS_set_port_b(PAUSE_BUTTON, (nespad_state & 0x08) != 0);
 }
+
+
 
 int main() {
     vreg_set_voltage(VREG_VOLTAGE_1_15);
@@ -360,31 +361,25 @@ int main() {
     multicore_launch_core1(render_loop);
     sem_release(&vga_start_semaphore);
 
-
     rom_file_selector();
     memset(&textmode, 0x00, sizeof(textmode));
     memset(&colors, 0x00, sizeof(colors));
     sleep_ms(50);
     resolution = RESOLUTION_NATIVE;
 
-    if (!SMS_init(&sms)) {
+    if (!SMS_init()) {
         printf("Failed to init SMS");
     }
 
-    SMS_set_colour_callback(&sms, core_colour_callback);
-    SMS_set_vblank_callback(&sms, core_vblank_callback);
-    /*
-    if (audio_init)
-    {
-        SMS_set_apu_callback(&sms, core_audio_callback, sms_audio_samples, SDL_arraysize(sms_audio_samples), AUDIO_FREQ);
-    }
-     */
+    SMS_set_colour_callback( core_colour_callback);
+    SMS_set_vblank_callback( core_vblank_callback);
 
-    SMS_set_pixels(&sms, &SCREEN, SMS_SCREEN_WIDTH, 8);
+
+    SMS_set_pixels( &SCREEN, SMS_SCREEN_WIDTH, 8);
 
     //mgb_init(&sms);
 
-    if (!SMS_loadrom(&sms, rom, rom_size, SMS_System_SMS)) {
+    if (!SMS_loadrom( rom, rom_size, SMS_System_SMS)) {
         printf("Failed running rom\r\n");
     } else {
             printf("ROM loaded.  size %i", rom_size);
@@ -392,6 +387,6 @@ int main() {
 
     while (true) {
         handle_input();
-        SMS_run(&sms, SMS_CYCLES_PER_FRAME);
+        SMS_run( SMS_CYCLES_PER_FRAME);
     }
 }
