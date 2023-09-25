@@ -1,7 +1,7 @@
 // this code is all based on the fantastic docs linked below
 // SOURCE: https://www.smspower.org/uploads/Development/richard.txt
 // SOURCE: https://www.smspower.org/uploads/Development/psg-20030421.txt
-
+#include <pico.h>
 #include "sms_internal.h"
 #include <stdint.h>
 #include <string.h>
@@ -143,7 +143,7 @@ static FORCE_INLINE void tick_tone(const uint8_t index, const uint8_t cycles)
     }
 }
 
-static FORCE_INLINE void tick_noise(const uint8_t cycles)
+static FORCE_INLINE void __not_in_flash_func(tick_noise)(const uint8_t cycles)
 {
     PSG.noise.counter -= cycles;
 

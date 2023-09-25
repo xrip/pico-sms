@@ -1,3 +1,4 @@
+#include "pico.h"
 #include "assert.h"
 #include "sms.h"
 #include "sms_internal.h"
@@ -108,7 +109,7 @@ __attribute__((always_inline)) inline void SMS_skip_frame(bool enable)
     sms.skip_frame = enable;
 }
 
-__attribute__((always_inline)) inline void SMS_set_system_type(enum SMS_System system)
+__attribute__((always_inline)) inline void __not_in_flash_func(SMS_set_system_type)(enum SMS_System system)
 {
     sms.system = system;
 }
@@ -417,7 +418,7 @@ void SMS_set_vblank_callback(sms_vblank_callback_t cb)
     sms.vblank_callback = cb;
 }
 
-void SMS_set_colour_callback(sms_colour_callback_t cb)
+void __not_in_flash_func(SMS_set_colour_callback)(sms_colour_callback_t cb)
 {
     sms.colour_callback = cb;
 }
@@ -481,7 +482,7 @@ bool SMS_loadstate(const struct SMS_State* state)
     return true;
 }
 
-bool SMS_parity16(uint16_t value)
+bool __not_in_flash_func(SMS_parity16)(uint16_t value)
 {
 //    #if HAS_BUILTIN(__builtin_parity) && !defined(N64)
 //        return !__builtin_parity(value);

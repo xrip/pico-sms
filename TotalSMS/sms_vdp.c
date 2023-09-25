@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
-
+#include <pico.h>
 extern struct SMS_Core sms;
 #define VDP sms.vdp
 
@@ -1031,7 +1031,7 @@ static void vdp_render_frame()
     #endif
 }
 
-static void vdp_tick()
+void __not_in_flash_func(vdp_tick)()
 {
     if (LIKELY(vdp_is_display_active()))
     {
@@ -1086,7 +1086,7 @@ static void vdp_tick()
     }
 }
 
-void vdp_run(const uint8_t cycles)
+void __not_in_flash_func(vdp_run)(const uint8_t cycles)
 {
     VDP.cycles += cycles;
 

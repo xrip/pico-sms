@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 #include <string.h>
-
+#include "pico.h"
 extern struct SMS_Core sms;
 
 // cycles tables taken from the code linked below (thanks!)
@@ -200,7 +200,7 @@ enum
 #define readIO(addr) SMS_read_io(addr)
 #define writeIO(addr,value) SMS_write_io(addr, value)
 
-static FORCE_INLINE uint8_t get_r8(const uint8_t idx)
+static FORCE_INLINE uint8_t __not_in_flash_func(get_r8)(const uint8_t idx)
 {
     switch (idx & 0x7)
     {
@@ -218,7 +218,7 @@ static FORCE_INLINE uint8_t get_r8(const uint8_t idx)
     UNREACHABLE(0xFF);
 }
 
-static FORCE_INLINE void set_r8(const uint8_t value, const uint8_t idx)
+static FORCE_INLINE void __not_in_flash_func(set_r8)(const uint8_t value, const uint8_t idx)
 {
     switch (idx & 0x7)
     {
@@ -233,7 +233,7 @@ static FORCE_INLINE void set_r8(const uint8_t value, const uint8_t idx)
     }
 }
 
-static FORCE_INLINE uint16_t get_r16(const uint8_t idx)
+static FORCE_INLINE uint16_t __not_in_flash_func(get_r16)(const uint8_t idx)
 {
     switch (idx & 0x3)
     {
@@ -247,7 +247,7 @@ static FORCE_INLINE uint16_t get_r16(const uint8_t idx)
     UNREACHABLE(0xFF);
 }
 
-static FORCE_INLINE void set_r16(uint16_t value, const uint8_t idx)
+static FORCE_INLINE void __not_in_flash_func(set_r16)(uint16_t value, const uint8_t idx)
 {
     switch (idx & 0x3)
     {
@@ -1822,7 +1822,7 @@ __attribute__((noinline)) static void execute_ED()
     }
 }
 
-static FORCE_INLINE void execute()
+static FORCE_INLINE void __not_in_flash_func(execute)()
 {
     const uint8_t opcode = read8(REG_PC++);
     sms.cpu.cycles += CYC_00[opcode];

@@ -94,11 +94,11 @@ struct Z80_GeneralRegisterSet
 
 struct Z80
 {
-    uint16_t cycles;
+    uint_fast32_t cycles;
 
     // [special purpose registers]
-    uint16_t PC; // program counter
-    uint16_t SP; // stack pointer
+    uint_fast16_t PC; // program counter
+    uint_fast16_t SP; // stack pointer
 
     // these are actually mainly 16-bit registers, however, some instructions
     // split these into lo / hi bytes, similar to the general_reg_set.
@@ -250,7 +250,7 @@ struct SMS_Vdp
     // not when the register is updated!
     uint8_t vertical_scroll;
 
-    int16_t cycles;
+    uint_fast32_t cycles;
     uint16_t hcount;
     uint16_t vcount;
 
