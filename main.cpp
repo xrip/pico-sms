@@ -20,8 +20,6 @@
 #include "ff.h"
 #include "VGA_ROM_F16.h"
 
-#include "rom.h"
-
 /*
 #define ROM Sonic_The_Hedgehog__USA__Europe__sms
 #define ROM_SIZE Sonic_The_Hedgehog__USA__Europe__sms_len
