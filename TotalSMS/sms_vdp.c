@@ -1,3 +1,4 @@
+#include "pico.h"
 #include "sms.h"
 #include "sms_internal.h"
 #include "sms_types.h"
@@ -40,22 +41,22 @@ enum
 // frame_int 202 cycles into line 192 (607 mclks)
 // line_int 202 cycles into triggering (608 mclks)
 
-static FORCE_INLINE bool vdp_is_line_irq_wanted(const struct SMS_Core* sms)
+static FORCE_INLINE bool __not_in_flash_func(vdp_is_line_irq_wanted)(const struct SMS_Core* sms)
 {
     return IS_BIT_SET(VDP.registers[0x0], 4);
 }
 
-static FORCE_INLINE bool vdp_is_vblank_irq_wanted(const struct SMS_Core* sms)
+static FORCE_INLINE bool __not_in_flash_func(vdp_is_vblank_irq_wanted)(const struct SMS_Core* sms)
 {
     return IS_BIT_SET(VDP.registers[0x1], 5);
 }
 
-static FORCE_INLINE bool vdp_is_screen_size_change_enabled(const struct SMS_Core* sms)
+static FORCE_INLINE bool __not_in_flash_func(vdp_is_screen_size_change_enabled)(const struct SMS_Core* sms)
 {
     return IS_BIT_SET(VDP.registers[0x0], 1);
 }
 
-static FORCE_INLINE uint16_t vdp_get_nametable_base_addr(const struct SMS_Core* sms)
+static FORCE_INLINE uint16_t __not_in_flash_func(vdp_get_nametable_base_addr)(const struct SMS_Core* sms)
 {
     if (SMS_is_system_type_sg(sms))
     {
@@ -67,7 +68,7 @@ static FORCE_INLINE uint16_t vdp_get_nametable_base_addr(const struct SMS_Core* 
     }
 }
 
-static FORCE_INLINE uint16_t vdp_get_sprite_attribute_base_addr(const struct SMS_Core* sms)
+static FORCE_INLINE uint16_t __not_in_flash_func(vdp_get_sprite_attribute_base_addr)(const struct SMS_Core* sms)
 {
     if (SMS_is_system_type_sg(sms))
     {
@@ -79,17 +80,17 @@ static FORCE_INLINE uint16_t vdp_get_sprite_attribute_base_addr(const struct SMS
     }
 }
 
-static FORCE_INLINE bool vdp_get_sprite_pattern_select(const struct SMS_Core* sms)
+static FORCE_INLINE bool __not_in_flash_func(vdp_get_sprite_pattern_select)(const struct SMS_Core* sms)
 {
     return IS_BIT_SET(VDP.registers[0x6], 2);
 }
 
-static FORCE_INLINE bool vdp_is_display_enabled(const struct SMS_Core* sms)
+static FORCE_INLINE bool __not_in_flash_func(vdp_is_display_enabled)(const struct SMS_Core* sms)
 {
     return IS_BIT_SET(VDP.registers[0x1], 6);
 }
 
-static FORCE_INLINE uint8_t vdp_get_sprite_height(const struct SMS_Core* sms)
+static FORCE_INLINE uint8_t __not_in_flash_func(vdp_get_sprite_height)(const struct SMS_Core* sms)
 {
     const bool doubled_sprites = IS_BIT_SET(VDP.registers[0x1], 0);
     const uint8_t sprite_size = IS_BIT_SET(VDP.registers[0x1], 1) ? 16 : 8;
@@ -98,7 +99,7 @@ static FORCE_INLINE uint8_t vdp_get_sprite_height(const struct SMS_Core* sms)
 }
 
 // returns the hieght of the screen
-static uint16_t vdp_get_screen_height(const struct SMS_Core* sms)
+FORCE_INLINE static uint16_t __not_in_flash_func(vdp_get_screen_height)(const struct SMS_Core* sms)
 {
     if (!vdp_is_screen_size_change_enabled(sms))
     {
@@ -118,7 +119,7 @@ static uint16_t vdp_get_screen_height(const struct SMS_Core* sms)
     }
 }
 
-static uint8_t vdp_get_overscan_colour(const struct SMS_Core* sms)
+FORCE_INLINE static uint8_t __not_in_flash_func(vdp_get_overscan_colour)(const struct SMS_Core* sms)
 {
     return VDP.registers[0x7] & 0xF;
 }
@@ -155,7 +156,7 @@ static FORCE_INLINE struct VDP_region vdp_get_region(const struct SMS_Core* sms)
     }
 }
 
-static FORCE_INLINE bool vdp_is_display_active(const struct SMS_Core* sms)
+static FORCE_INLINE bool __not_in_flash_func(vdp_is_display_active)(const struct SMS_Core* sms)
 {
     if (SMS_is_system_type_gg(sms))
     {
@@ -208,7 +209,7 @@ static void write_scanline_to_frame(struct SMS_Core* sms, const pixel_width_t* s
 }
 #endif
 
-uint8_t vdp_status_flag_read(struct SMS_Core* sms)
+FORCE_INLINE uint8_t __not_in_flash_func(vdp_status_flag_read)(struct SMS_Core* sms)
 {
     if (SMS_is_system_type_sg(sms))
     {
@@ -245,7 +246,7 @@ uint8_t vdp_status_flag_read(struct SMS_Core* sms)
     }
 }
 
-void vdp_io_write(struct SMS_Core* sms, const uint8_t addr, const uint8_t value)
+void FORCE_INLINE vdp_io_write(struct SMS_Core* sms, const uint8_t addr, const uint8_t value)
 {
     if (SMS_is_system_type_sg(sms))
     {
@@ -289,7 +290,7 @@ struct PriorityBuf
     bool array[SMS_SCREEN_WIDTH];
 };
 
-static void vdp_mode2_render_background(struct SMS_Core* sms, pixel_width_t* scanline)
+static void FORCE_INLINE vdp_mode2_render_background(struct SMS_Core* sms, pixel_width_t* scanline)
 {
     const uint8_t line = VDP.vcount;
     const uint8_t fine_line = line & 0x7;
@@ -323,7 +324,7 @@ static void vdp_mode2_render_background(struct SMS_Core* sms, pixel_width_t* sca
     }
 }
 
-static void vdp_mode1_render_background(struct SMS_Core* sms, pixel_width_t* scanline)
+static void FORCE_INLINE vdp_mode1_render_background(struct SMS_Core* sms, pixel_width_t* scanline)
 {
     const uint8_t line = VDP.vcount;
     const uint8_t fine_line = line & 0x7;
@@ -357,7 +358,7 @@ static void vdp_mode1_render_background(struct SMS_Core* sms, pixel_width_t* sca
     }
 }
 
-static inline struct CachedPalette vdp_get_palette(struct SMS_Core* sms, const uint16_t pattern_index)
+static inline struct CachedPalette __not_in_flash_func(vdp_get_palette)(struct SMS_Core* sms, const uint16_t pattern_index)
 {
     struct CachedPalette* cpal = &VDP.cached_palette[pattern_index >> 2];
 
@@ -393,7 +394,7 @@ static inline struct CachedPalette vdp_get_palette(struct SMS_Core* sms, const u
     return *cpal;
 }
 
-static void vdp_render_background(struct SMS_Core* sms, pixel_width_t* scanline, struct PriorityBuf* prio)
+static void FORCE_INLINE vdp_render_background(struct SMS_Core* sms, pixel_width_t* scanline, struct PriorityBuf* prio)
 {
     const struct VDP_region region = vdp_get_region(sms);
 
@@ -506,7 +507,7 @@ static void vdp_render_background(struct SMS_Core* sms, pixel_width_t* scanline,
     }
 }
 
-void SMS_get_pixel_region(const struct SMS_Core* sms, int* x, int* y, int* w, int* h)
+void FORCE_INLINE SMS_get_pixel_region(const struct SMS_Core* sms, int* x, int* y, int* w, int* h)
 {
     // todo: support different height modes
     if (SMS_is_system_type_gg(sms))
@@ -539,7 +540,7 @@ struct SgSpriteEntries
     uint8_t count;
 };
 
-static struct SgSpriteEntries vdp_parse_sg_sprites(struct SMS_Core* sms)
+static struct SgSpriteEntries __not_in_flash_func(vdp_parse_sg_sprites)(struct SMS_Core* sms)
 {
     if (!SMS_is_system_type_sg(sms))
     {
@@ -587,7 +588,7 @@ static struct SgSpriteEntries vdp_parse_sg_sprites(struct SMS_Core* sms)
     return sprites;
 }
 
-static void vdp_mode1_render_sprites(struct SMS_Core* sms, pixel_width_t* scanline)
+static void FORCE_INLINE vdp_mode1_render_sprites(struct SMS_Core* sms, pixel_width_t* scanline)
 {
     const uint8_t line = VDP.vcount;
     const uint16_t tile_addr = (VDP.registers[0x6] & 0x7) * 0x800;
@@ -677,7 +678,7 @@ struct SpriteEntries
     uint8_t count;
 };
 
-static struct SpriteEntries vdp_parse_sprites(struct SMS_Core* sms)
+static struct SpriteEntries __not_in_flash_func(vdp_parse_sprites)(struct SMS_Core* sms)
 {
     // assert((VDP.registers[0x6] & 0x3) == 0x3 && "Sprite Pattern Generator Base Address");
 
@@ -740,7 +741,7 @@ static struct SpriteEntries vdp_parse_sprites(struct SMS_Core* sms)
     return sprites;
 }
 
-static void vdp_render_sprites(struct SMS_Core* sms, pixel_width_t* scanline, const struct PriorityBuf* prio)
+static void FORCE_INLINE vdp_render_sprites(struct SMS_Core* sms, pixel_width_t* scanline, const struct PriorityBuf* prio)
 {
     const struct VDP_region region = vdp_get_region(sms);
 
@@ -838,7 +839,7 @@ static void vdp_render_sprites(struct SMS_Core* sms, pixel_width_t* scanline, co
     }
 }
 
-static void vdp_update_sms_colours(struct SMS_Core* sms)
+static void FORCE_INLINE __not_in_flash_func(vdp_update_sms_colours)(struct SMS_Core* sms)
 {
     assert(sms->vdp.dirty_cram_max <= 32);
 
@@ -858,7 +859,7 @@ static void vdp_update_sms_colours(struct SMS_Core* sms)
     sms->vdp.dirty_cram_min = sms->vdp.dirty_cram_max = 0;
 }
 
-static void vdp_update_gg_colours(struct SMS_Core* sms)
+static void FORCE_INLINE __not_in_flash_func(vdp_update_gg_colours)(struct SMS_Core* sms)
 {
     for (int i = sms->vdp.dirty_cram_min; i < sms->vdp.dirty_cram_max; i += 2)
     {
@@ -878,7 +879,7 @@ static void vdp_update_gg_colours(struct SMS_Core* sms)
     sms->vdp.dirty_cram_min = sms->vdp.dirty_cram_max = 0;
 }
 
-static void vdp_update_sg_colours(struct SMS_Core* sms)
+FORCE_INLINE static void __not_in_flash_func(vdp_update_sg_colours)(struct SMS_Core* sms)
 {
     struct Colour { uint8_t r,g,b; };
     // https://www.smspower.org/uploads/Development/sg1000.txt
@@ -920,7 +921,7 @@ static void vdp_update_sg_colours(struct SMS_Core* sms)
     memset(sms->vdp.dirty_cram, false, sizeof(sms->vdp.dirty_cram));
 }
 
-static void vdp_update_palette(struct SMS_Core* sms)
+FORCE_INLINE static void vdp_update_palette(struct SMS_Core* sms)
 {
     if (sms->colour_callback)
     {
@@ -939,7 +940,7 @@ static void vdp_update_palette(struct SMS_Core* sms)
     }
 }
 
-void vdp_mark_palette_dirty(struct SMS_Core* sms)
+FORCE_INLINE void vdp_mark_palette_dirty(struct SMS_Core* sms)
 {
     memset(sms->vdp.dirty_cram, true, sizeof(sms->vdp.dirty_cram));
     sms->vdp.dirty_cram_min = 0;
@@ -956,7 +957,7 @@ void vdp_mark_palette_dirty(struct SMS_Core* sms)
     vdp_update_palette(sms);
 }
 
-bool vdp_has_interrupt(const struct SMS_Core* sms)
+FORCE_INLINE bool vdp_has_interrupt(const struct SMS_Core* sms)
 {
     const bool frame_interrupt = VDP.frame_interrupt_pending && vdp_is_vblank_irq_wanted(sms);
     const bool line_interrupt = VDP.line_interrupt_pending && vdp_is_line_irq_wanted(sms);
@@ -964,7 +965,7 @@ bool vdp_has_interrupt(const struct SMS_Core* sms)
     return frame_interrupt || line_interrupt;
 }
 
-static void vdp_advance_line_counter(struct SMS_Core* sms)
+FORCE_INLINE static void vdp_advance_line_counter(struct SMS_Core* sms)
 {
     // i don't think sg has line interrupt
     if (!SMS_is_system_type_sg(sms))
@@ -980,7 +981,7 @@ static void vdp_advance_line_counter(struct SMS_Core* sms)
     }
 }
 
-static void vdp_render_frame(struct SMS_Core* sms)
+FORCE_INLINE static void vdp_render_frame(struct SMS_Core* sms)
 {
     // only render if display is enabled
     if (!vdp_is_display_enabled(sms))
@@ -1031,7 +1032,7 @@ static void vdp_render_frame(struct SMS_Core* sms)
     #endif
 }
 
-static void vdp_tick(struct SMS_Core* sms)
+static void __not_in_flash_func(vdp_tick)(struct SMS_Core* sms)
 {
     if (LIKELY(vdp_is_display_active(sms)))
     {

@@ -3,7 +3,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 #include "sms_types.h"
 
 // if neither set, check compiler, else, default to little

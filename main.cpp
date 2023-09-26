@@ -368,7 +368,7 @@ int main() {
     vreg_set_voltage(VREG_VOLTAGE_1_15);
     set_sys_clock_khz(282000, true);
 
-    stdio_init_all();
+    //stdio_init_all();
 
 //    sleep_ms(3000);
     nespad_begin(clock_get_hz(clk_sys) / 1000, NES_GPIO_CLK, NES_GPIO_DATA, NES_GPIO_LAT);
@@ -386,7 +386,7 @@ int main() {
 #if ENABLE_SOUND
     i2s_config = i2s_get_default_config();
     i2s_config.sample_freq = AUDIO_FREQ;
-    i2s_config.dma_trans_count = i2s_config.sample_freq / 50;
+    i2s_config.dma_trans_count = i2s_config.sample_freq / 20;
     i2s_volume(&i2s_config, 0);
     i2s_init(&i2s_config);
 #endif
@@ -421,8 +421,8 @@ int main() {
     for (;;) {
         handle_input();
         SMS_run(&sms, SMS_CYCLES_PER_FRAME);
-/*
-        if (frames == 600) {
+
+/*        if (frames == 600) {
             uint64_t end_time;
             uint32_t diff;
             uint32_t fps;
@@ -437,7 +437,7 @@ int main() {
             stdio_flush();
             frames = 0;
             start_time = time_us_64();
-        }
-*/
+        }*/
+
     }
 }

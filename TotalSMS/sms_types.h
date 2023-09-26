@@ -94,21 +94,22 @@ struct Z80_GeneralRegisterSet
 
 struct Z80
 {
-    uint16_t cycles;
+    uint_fast16_t cycles;
 
     // [special purpose registers]
-    uint16_t PC; // program counter
-    uint16_t SP; // stack pointer
+    uint_fast16_t PC; // program counter
+    uint_fast16_t SP; // stack pointer
 
     // these are actually mainly 16-bit registers, however, some instructions
     // split these into lo / hi bytes, similar to the general_reg_set.
-    uint8_t IXL;
-    uint8_t IXH;
-    uint8_t IYL;
-    uint8_t IYH;
 
-    uint8_t I; // interrupt vector
-    uint8_t R; // memory refresh
+    uint_fast8_t  IXL;
+    uint_fast8_t  IXH;
+    uint_fast8_t  IYL;
+    uint_fast8_t  IYH;
+
+    uint_fast8_t  I; // interrupt vector
+    uint_fast8_t  R; // memory refresh
 
     // [general purpose registers]
     // theres 2-sets, main and alt
@@ -174,7 +175,7 @@ struct SMS_Cart
     } mappers;
 
     // some games have 8-16-32KiB ram
-    uint8_t ram[2][1024 * 16];
+    uint8_t __attribute__((aligned(4))) ram[2][1024 * 16];
 
     uint8_t max_bank_mask;
     bool sram_used; // set when game uses sram at any point
@@ -218,32 +219,32 @@ struct CachedPalette
 struct SMS_Vdp
 {
     // this is used for vram r/w and cram writes.
-    uint16_t addr;
+    uint_fast16_t addr;
     enum VDP_Code code;
 
-    uint8_t vram[1024 * 16];
-    bool dirty_vram[(1024 * 16) / 4];
-    struct CachedPalette cached_palette[(1024 * 16) / 4];
+    uint8_t __attribute__((aligned(4))) vram[1024 * 16];
+    bool __attribute__((aligned(4))) dirty_vram[(1024 * 16) / 4];
+    struct CachedPalette __attribute__((aligned(4))) cached_palette[(1024 * 16) / 4];
 
     // bg can use either palette, while sprites can only use
     // the second half of the cram.
-    uint8_t cram[64];
+    uint8_t __attribute__((aligned(4))) cram[64];
 
     // writes to even addresses are latched!
     uint8_t cram_gg_latch;
 
     // set when cram value changes, the colour callback is then called
     // during rendering of the line.
-    bool dirty_cram[64];
+    bool __attribute__((aligned(4))) dirty_cram[64];
     // indicates where the loop should start and end
     uint8_t dirty_cram_min;
     uint8_t dirty_cram_max;
 
     // the actual colour set to the pixels
-    uint32_t colour[32];
+    uint32_t __attribute__((aligned(4))) colour[32];
 
     // 16 registers, not all are useable
-    uint8_t registers[0x10];
+    uint8_t __attribute__((aligned(4))) registers[0x10];
 
     // vertical scroll is updated when the display is not active,
     // not when the register is updated!
