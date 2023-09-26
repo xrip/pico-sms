@@ -296,8 +296,7 @@ void __time_critical_func(render_loop)() {
     }
 }
 // We get 6 bit RGB values, pack them into a byte swapped RGB565 value
-//#define VGA_RGB_222(r, g, b) ((r << 4) | (g << 2) | b)
-#define VGA_RGB_222(r, g, b) (((r) & 0x3) << 4 | ((g) & 0x3) << 2 | ((b) & 0x3))
+#define VGA_RGB_222(r, g, b) ((r << 4) | (g << 2) | b)
 __attribute__((always_inline)) inline uint32_t core_colour_callback(void *user, uint8_t r, uint8_t g, uint8_t b) {
 //    (void) user;
 
