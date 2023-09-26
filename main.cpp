@@ -12,9 +12,12 @@
 #include <cstdarg>
 
 #include "pico/multicore.h"
-
 #include "sms.h"
 #include "vga.h"
+#if ENABLE_SOUND
+#include "audio.h"
+#endif
+
 #include "nespad.h"
 #include "f_util.h"
 #include "ff.h"
@@ -283,20 +286,20 @@ void __time_critical_func(render_loop)() {
                 }
                 break;
             case RESOLUTION_NATIVE:
-                if (y < SMS_SCREEN_HEIGHT * 2) {
+                if (y >= 44 && y < (44 + SMS_SCREEN_HEIGHT * 2)) {
                     for (int x = 0; x < SMS_SCREEN_WIDTH * 2; x += 2)
-                        (uint16_t &) linebuf->line[64 + x] = X2(SCREEN[(y / 2) * SMS_SCREEN_WIDTH + (x / 2)]);
+                        (uint16_t &) linebuf->line[64 + x] = X2(SCREEN[((y - 44) >> 1) * SMS_SCREEN_WIDTH + (x >> 1)]);
                 } else {
-                    //memset(linebuf->line, 0, SMS_SCREEN_HEIGHT*4);
+                    memset(linebuf->line, 0, 640);
                 }
         }
     }
 }
 // We get 6 bit RGB values, pack them into a byte swapped RGB565 value
-#define VGA_RGB_222(r, g, b) ((r << 4) | (g << 2) | b)
-
+//#define VGA_RGB_222(r, g, b) ((r << 4) | (g << 2) | b)
+#define VGA_RGB_222(r, g, b) (((r) & 0x3) << 4 | ((g) & 0x3) << 2 | ((b) & 0x3))
 __attribute__((always_inline)) inline uint32_t core_colour_callback(void *user, uint8_t r, uint8_t g, uint8_t b) {
-    (void) user;
+//    (void) user;
 
     if (SMS_get_system_type(&sms) == SMS_System_GG) {
         r <<= 4;
@@ -308,21 +311,28 @@ __attribute__((always_inline)) inline uint32_t core_colour_callback(void *user, 
         b <<= 6;
     }
     return VGA_RGB_222(r >> 6, g >> 6, b >> 6);
-    //return __builtin_bswap16((r << 4) + ((g << 2) + b));
 }
 
+uint_fast32_t frames = 0;
+uint64_t start_time;
+#define FRAME_SKIP (1)
 static void core_vblank_callback(void *user) {
     (void) user;
-/*    void* pixels = NULL; int pitch = 0;
-    SDL_LockTexture(texture, NULL, &pixels, &pitch);
-    SDL_ConvertPixels(
-            SMS_SCREEN_WIDTH, SMS_SCREEN_HEIGHT, // w,h
-            pixel_format_enum, pixel_buffer, SMS_SCREEN_WIDTH * pixel_format->BytesPerPixel, // src
-            pixel_format_enum, pixels, pitch // dst
-    );
-    SDL_UnlockTexture(texture);
+    frames++;
+    static int fps_skip_counter = FRAME_SKIP;
 
-    render();*/
+    if (fps_skip_counter > 0)
+    {
+        fps_skip_counter--;
+        SMS_skip_frame(&sms, true);
+        return;
+    }
+    else
+    {
+        fps_skip_counter = FRAME_SKIP;
+        SMS_skip_frame(&sms, false);
+    }
+
 }
 
 static void handle_input() {
@@ -339,13 +349,28 @@ static void handle_input() {
     SMS_set_port_b(&sms, PAUSE_BUTTON, (nespad_state & 0x08) != 0);
 }
 
+
+#if ENABLE_SOUND
+i2s_config_t i2s_config;
+#define AUDIO_FREQ (22050)
+#define SAMPLES 4096
+static struct SMS_ApuSample sms_audio_samples[SAMPLES];
+
+__attribute__((always_inline)) inline void core_audio_callback(void* user, struct SMS_ApuSample* samples, uint32_t size) {
+    (void)user;
+    static int_fast16_t audio_buffer[SAMPLES*2];
+    SMS_apu_mixer_s16(samples, reinterpret_cast<int16_t *>(audio_buffer), size);
+    i2s_dma_write(&i2s_config, reinterpret_cast<const int16_t *>(audio_buffer));
+}
+#endif
+
 int main() {
     vreg_set_voltage(VREG_VOLTAGE_1_15);
     set_sys_clock_khz(282000, true);
 
     stdio_init_all();
 
-    //sleep_ms(3000);
+//    sleep_ms(3000);
     nespad_begin(clock_get_hz(clk_sys) / 1000, NES_GPIO_CLK, NES_GPIO_DATA, NES_GPIO_LAT);
     printf("Start program\n");
 
@@ -358,7 +383,13 @@ int main() {
     multicore_launch_core1(render_loop);
     sem_release(&vga_start_semaphore);
 
-
+#if ENABLE_SOUND
+    i2s_config = i2s_get_default_config();
+    i2s_config.sample_freq = AUDIO_FREQ;
+    i2s_config.dma_trans_count = i2s_config.sample_freq / 50;
+    i2s_volume(&i2s_config, 0);
+    i2s_init(&i2s_config);
+#endif
     rom_file_selector();
     memset(&textmode, 0x00, sizeof(textmode));
     memset(&colors, 0x00, sizeof(colors));
@@ -371,13 +402,10 @@ int main() {
 
     SMS_set_colour_callback(&sms, core_colour_callback);
     SMS_set_vblank_callback(&sms, core_vblank_callback);
-    /*
-    if (audio_init)
-    {
-        SMS_set_apu_callback(&sms, core_audio_callback, sms_audio_samples, SDL_arraysize(sms_audio_samples), AUDIO_FREQ);
-    }
-     */
 
+#if ENABLE_SOUND
+    SMS_set_apu_callback(&sms, core_audio_callback, sms_audio_samples, sizeof(sms_audio_samples)/sizeof(sms_audio_samples[0]), AUDIO_FREQ);
+#endif
     SMS_set_pixels(&sms, &SCREEN, SMS_SCREEN_WIDTH, 8);
 
     //mgb_init(&sms);
@@ -388,8 +416,28 @@ int main() {
             printf("ROM loaded.  size %i", rom_size);
     };
 
-    while (true) {
+    start_time = time_us_64();
+
+    for (;;) {
         handle_input();
         SMS_run(&sms, SMS_CYCLES_PER_FRAME);
+/*
+        if (frames == 600) {
+            uint64_t end_time;
+            uint32_t diff;
+            uint32_t fps;
+
+            end_time = time_us_64();
+            diff = end_time - start_time;
+            fps = ((uint64_t) frames * 1000 * 1000) / diff;
+            printf("Frames: %u\r\n"
+                   "Time: %lu us\r\n"
+                   "FPS: %lu\r\n",
+                   frames, diff, fps);
+            stdio_flush();
+            frames = 0;
+            start_time = time_us_64();
+        }
+*/
     }
 }

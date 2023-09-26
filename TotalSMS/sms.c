@@ -101,22 +101,22 @@ void SMS_set_system_type(struct SMS_Core* sms, enum SMS_System system)
     sms->system = system;
 }
 
-enum SMS_System SMS_get_system_type(const struct SMS_Core* sms)
+enum SMS_System FORCE_INLINE SMS_get_system_type(const struct SMS_Core* sms)
 {
     return sms->system;
 }
 
-bool SMS_is_system_type_sms(const struct SMS_Core* sms)
+bool FORCE_INLINE SMS_is_system_type_sms(const struct SMS_Core* sms)
 {
     return SMS_get_system_type(sms) == SMS_System_SMS;
 }
 
-bool SMS_is_system_type_gg(const struct SMS_Core* sms)
+bool FORCE_INLINE SMS_is_system_type_gg(const struct SMS_Core* sms)
 {
     return SMS_get_system_type(sms) == SMS_System_GG;
 }
 
-bool SMS_is_system_type_sg(const struct SMS_Core* sms)
+bool FORCE_INLINE SMS_is_system_type_sg(const struct SMS_Core* sms)
 {
     return SMS_get_system_type(sms) == SMS_System_SG1000;
 }

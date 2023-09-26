@@ -57,12 +57,13 @@ pico_set_program_version(sms "v0.1")
 target_include_directories(sms PRIVATE TotalSMS)
 
 pico_enable_stdio_uart(sms 0)
-pico_enable_stdio_usb(sms 1)
+pico_enable_stdio_usb(sms 0)
 
 target_link_libraries(sms PRIVATE
         TotalSMS
 
         vga
+        audio
         sdcard
         fatfs
         nespad
