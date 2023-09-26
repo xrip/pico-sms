@@ -316,7 +316,7 @@ uint_fast32_t frames = 0;
 uint64_t start_time;
 #define FRAME_SKIP (1)
 static void core_vblank_callback(void *user) {
-    (void) user;
+    //(void) user;
     frames++;
     static int fps_skip_counter = FRAME_SKIP;
 
