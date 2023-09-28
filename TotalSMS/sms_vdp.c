@@ -778,7 +778,7 @@ static void FORCE_INLINE vdp_render_sprites(struct SMS_Core* sms, pixel_width_t*
             pattern_index &= ~0x1;
         }
 
-        pattern_index *= 32;
+        pattern_index <<= 5;
 
         // this has already taken into account of sprite size when parsing
         // sprites, so for example:
@@ -787,7 +787,7 @@ static void FORCE_INLINE vdp_render_sprites(struct SMS_Core* sms, pixel_width_t*
         // - sprite_size = 8,
         // then y will be accepted for this line, but needs to be offset from
         // the current line we are on, so line-sprite->y = 2
-        pattern_index += (line - sprite->y) * 4;
+        pattern_index += (line - sprite->y) << 2;
 
         const struct CachedPalette cpal = vdp_get_palette(sms, pattern_index);
         const uint32_t palette = cpal.normal;//horizontal_flip ? cpal.flipped : cpal.normal;
