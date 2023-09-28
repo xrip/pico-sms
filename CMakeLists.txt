@@ -68,6 +68,7 @@ target_link_libraries(sms PRIVATE
         fatfs
         nespad
 
+        pico_runtime
         pico_stdlib
         pico_multicore
         hardware_dma

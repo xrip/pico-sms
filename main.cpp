@@ -1,5 +1,6 @@
 #include <cstdio>
 #include "pico/stdlib.h"
+#include "pico/runtime.h"
 #include "hardware/pio.h"
 #include "hardware/i2c.h"
 #include "hardware/vreg.h"
