@@ -42,8 +42,6 @@ MARK_AS_ADVANCED(
 
 add_subdirectory(TotalSMS)
 add_subdirectory(drivers/vga)
-add_subdirectory(drivers/audio)
-add_subdirectory(drivers/ps2kbd)
 add_subdirectory(drivers/nespad)
 add_subdirectory(drivers/fatfs)
 add_subdirectory(drivers/sdcard)
@@ -66,7 +64,6 @@ target_link_libraries(sms PRIVATE
         TotalSMS
 
         vga
-        audio
         sdcard
         fatfs
         nespad
