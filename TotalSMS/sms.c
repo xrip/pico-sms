@@ -495,7 +495,7 @@ bool SMS_parity16(uint16_t value)
     #endif
 }
 
-bool SMS_parity8(uint8_t value)
+bool FORCE_INLINE SMS_parity8(uint8_t value)
 {
     #if HAS_BUILTIN(__builtin_parity) && !defined(N64)
         return !__builtin_parity(value);

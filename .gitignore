@@ -1,5 +1,6 @@
 build
 uf2
+bin
 cmake-*
 fh.log
 /pimoroni-pico/
