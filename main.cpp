@@ -271,8 +271,6 @@ void __time_critical_func(render_loop)() {
                 if (y >= 22 && y < (22 + SMS_SCREEN_HEIGHT)) {
                     for (int x = 0; x < SMS_SCREEN_WIDTH * 2; x += 2)
                         (uint16_t &) linebuf->line[64 + x] = X2(SCREEN[(y - 22) * SMS_SCREEN_WIDTH + (x >> 1)]);
-                } else {
-                    memset(linebuf->line, 0, 640);
                 }
         }
     }
@@ -375,6 +373,7 @@ int main() {
     rom_file_selector();
     memset(&textmode, 0x00, sizeof(textmode));
     memset(&colors, 0x00, sizeof(colors));
+    memset(SCREEN, 0, sizeof(SCREEN));
     resolution = RESOLUTION_NATIVE;
 
     if (!SMS_init(&sms)) {
