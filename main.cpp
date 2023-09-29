@@ -246,9 +246,9 @@ void __time_critical_func(render_loop)() {
 
     sem_acquire_blocking(&vga_start_semaphore);
     VgaInit(vmode, 640, 480);
-
+    uint32_t y;
     while (linebuf = get_vga_line()) {
-        uint32_t y = linebuf->row;
+        y = linebuf->row;
 
         switch (resolution) {
             case RESOLUTION_TEXTMODE:
