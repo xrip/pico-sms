@@ -26,9 +26,13 @@
 #pragma GCC optimize("Ofast")
 
 #define FLASH_TARGET_OFFSET (1024 * 1024)
-const uint8_t *rom = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET);
-unsigned int rom_size = 0;
+const char *rom_filename = (const char*) (XIP_BASE + FLASH_TARGET_OFFSET);
+const uint8_t *rom = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET)+4096;
 static FATFS fs;
+
+
+
+
 
 static struct SMS_Core sms = { 0 };
 static const sVmode *vmode = nullptr;
@@ -55,7 +59,11 @@ void draw_text(char *text, uint8_t x, uint8_t y, uint8_t color, uint8_t bgcolor)
  * Load a .gb rom file in flash from the SD card
  */
 void load_cart_rom_file(char *filename) {
-    extern unsigned char VRAM[];
+    if (strcmp(rom_filename, filename) == 0) {
+        printf("Launching last rom");
+        return;
+    }
+
     FIL fil;
     FRESULT fr;
 
@@ -67,6 +75,15 @@ void load_cart_rom_file(char *filename) {
 
     UINT bytesRead;
     if (fr == FR_OK) {
+        uint32_t ints = save_and_disable_interrupts();
+        multicore_lockout_start_blocking();
+
+        // TODO: Save it after success loading to prevent corruptions
+        printf("Flashing %d bytes to flash address %x\r\n", 256, ofs);
+        flash_range_erase(ofs, 4096);
+        flash_range_program(ofs, reinterpret_cast<const uint8_t *>(filename), 256);
+
+        ofs += 4096;
         for (;;) {
             fr = f_read(&fil, buffer, bufsize, &bytesRead);
             if (fr == FR_OK) {
@@ -78,14 +95,10 @@ void load_cart_rom_file(char *filename) {
 
                 printf("Erasing...");
                 // Disable interupts, erase, flash and enable interrupts
-                uint32_t ints = save_and_disable_interrupts();
-                multicore_lockout_start_blocking();
-
                 flash_range_erase(ofs, bufsize);
                 printf("  -> Flashing...\r\n");
                 flash_range_program(ofs, buffer, bufsize);
-                multicore_lockout_end_blocking();
-                restore_interrupts(ints);
+
                 ofs += bufsize;
             } else {
                 printf("Error reading rom: %d\n", fr);
@@ -95,6 +108,8 @@ void load_cart_rom_file(char *filename) {
 
 
         f_close(&fil);
+        restore_interrupts(ints);
+        multicore_lockout_end_blocking();
     }
 }
 
@@ -256,12 +271,12 @@ void __time_critical_func(render_loop)() {
                     uint8_t glyph_row = VGA_ROM_F16[(textmode[y / 16][x] * 16) + y % 16];
                     uint8_t color = colors[y / 16][x];
 
-                    for (uint8_t bit = 0; bit < 8; bit++) {
-                        if (CHECK_BIT(glyph_row, bit)) {
-                            // FOREGROUND
+                        for (uint8_t bit = 0; bit < 8; bit++) {
+                            if (CHECK_BIT(glyph_row, bit)) {
+                                // FOREGROUND
                             linebuf->line[8 * x + bit] = (color >> 4) & 0xF;
-                        } else {
-                            // BACKGROUND
+                            } else {
+                                // BACKGROUND
                             linebuf->line[8 * x + bit] = color & 0xF;
                         }
                     }
@@ -391,10 +406,10 @@ int main() {
 
     //mgb_init(&sms);
 
-    if (!SMS_loadrom(&sms, rom, rom_size, SMS_System_SMS)) {
+    if (!SMS_loadrom(&sms, rom, 0, SMS_System_SMS)) {
         printf("Failed running rom\r\n");
     } else {
-            printf("ROM loaded.  size %i", rom_size);
+            printf("ROM loaded %s", rom_filename);
     };
 
     start_time = time_us_64();
