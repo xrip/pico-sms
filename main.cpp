@@ -288,6 +288,24 @@ void __time_critical_func(render_loop)() {
                 } else {
                     memset(linebuf->line, 0, 640);
                 }
+#if SHOW_FPS
+                // SHOW FPS
+                if (y < 16) {
+                    for (uint8_t x = 77; x < 80; x++) {
+                        uint8_t glyph_row = VGA_ROM_F16[(textmode[y / 16][x] * 16) + y % 16];
+                        uint8_t color = colors[y / 16][x];
+
+                        for (uint8_t bit = 0; bit < 8; bit++) {
+                            if (CHECK_BIT(glyph_row, bit)) {
+                                // FOREGROUND
+                                linebuf->line[8 * x + bit] = (color >> 4) & 0xF;
+                            } else {
+                                linebuf->line[8 * x + bit] = 0;
+                            }
+                        }
+                    }
+                }
+#endif
         }
     }
 }
@@ -416,23 +434,27 @@ int main() {
     for (;;) {
         handle_input();
         SMS_run(&sms, SMS_CYCLES_PER_FRAME);
-
-/*        if (frames == 600) {
+#if SHOW_FPS
+            if (frames == 60) {
             uint64_t end_time;
             uint32_t diff;
-            uint32_t fps;
-
+            uint8_t fps;
             end_time = time_us_64();
             diff = end_time - start_time;
             fps = ((uint64_t) frames * 1000 * 1000) / diff;
-            printf("Frames: %u\r\n"
+            char fps_text[3];
+            sprintf(fps_text, "%i", fps);
+            draw_text(fps_text, 77, 0, 0xFF, 0x00);
+
+/*            printf("Frames: %u\r\n"
                    "Time: %lu us\r\n"
                    "FPS: %lu\r\n",
                    frames, diff, fps);
+                   */
             stdio_flush();
             frames = 0;
             start_time = time_us_64();
-        }*/
-
+        }
+#endif
     }
 }
