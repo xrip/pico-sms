@@ -15,7 +15,7 @@
 #include "pico/multicore.h"
 #include "sms.h"
 #include "vga.h"
-#define ENABLE_SOUND 1
+
 #if ENABLE_SOUND
 #include "audio.h"
 #endif
@@ -29,6 +29,8 @@
 #define FLASH_TARGET_OFFSET (1024 * 1024)
 const char *rom_filename = (const char*) (XIP_BASE + FLASH_TARGET_OFFSET);
 const uint8_t *rom = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET)+4096;
+
+static size_t rom_size = 0;
 static FATFS fs;
 
 #define SHOW_FPS 1
@@ -60,17 +62,23 @@ void draw_text(char *text, uint8_t x, uint8_t y, uint8_t color, uint8_t bgcolor)
  * Load a .gb rom file in flash from the SD card
  */
 void load_cart_rom_file(char *filename) {
+#if 0
     if (strcmp(rom_filename, filename) == 0) {
         printf("Launching last rom");
         return;
     }
-
+#endif
     FIL fil;
     FRESULT fr;
 
-    size_t bufsize = 4096;
+    size_t bufsize = sizeof SCREEN;
     BYTE *buffer = (BYTE *) SCREEN;
     auto ofs = FLASH_TARGET_OFFSET;
+
+    FILINFO fi;
+    f_stat(filename, &fi);
+    rom_size = fi.fsize;
+
     printf("Writing %s rom to flash %x\r\n", filename, ofs);
     fr = f_open(&fil, filename, FA_READ);
 
@@ -83,6 +91,8 @@ void load_cart_rom_file(char *filename) {
         printf("Flashing %d bytes to flash address %x\r\n", 256, ofs);
         flash_range_erase(ofs, 4096);
         flash_range_program(ofs, reinterpret_cast<const uint8_t *>(filename), 256);
+
+
 
         ofs += 4096;
         for (;;) {
@@ -424,11 +434,11 @@ int main() {
 
     //mgb_init(&sms);
 
-    if (!SMS_loadrom(&sms, rom, 0, SMS_System_SMS)) {
+    if (!SMS_loadrom(&sms, rom, rom_size, SMS_System_SMS)) {
         printf("Failed running rom\r\n");
     } else {
-            printf("ROM loaded %s", rom_filename);
-    };
+            printf("ROM loaded %s size %i", rom_filename, rom_size);
+    }
 
     start_time = time_us_64();
 
@@ -452,7 +462,7 @@ int main() {
                    "FPS: %lu\r\n",
                    frames, diff, fps);
                    */
-            stdio_flush();
+            //stdio_flush();
             frames = 0;
             start_time = time_us_64();
         }
