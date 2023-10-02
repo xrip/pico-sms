@@ -1,3 +1,7 @@
+# v0.1.2
+
+Double keypress in menu fix
+
 # v0.1.1
 
 Fast load previous rom after reboot, prevents PICO flash wearoff also
