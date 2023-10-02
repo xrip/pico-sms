@@ -41,6 +41,7 @@ MARK_AS_ADVANCED(
         CMAKE_SHARED_LINKER_FLAGS_RELEASENODEBUG)
 
 add_subdirectory(TotalSMS)
+add_subdirectory(drivers/audio)
 add_subdirectory(drivers/vga)
 add_subdirectory(drivers/nespad)
 add_subdirectory(drivers/fatfs)
@@ -63,6 +64,7 @@ pico_enable_stdio_usb(sms 0)
 target_link_libraries(sms PRIVATE
         TotalSMS
 
+        audio
         vga
         sdcard
         fatfs

@@ -15,6 +15,7 @@
 #include "pico/multicore.h"
 #include "sms.h"
 #include "vga.h"
+#define ENABLE_SOUND 1
 #if ENABLE_SOUND
 #include "audio.h"
 #endif
@@ -30,7 +31,7 @@ const char *rom_filename = (const char*) (XIP_BASE + FLASH_TARGET_OFFSET);
 const uint8_t *rom = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET)+4096;
 static FATFS fs;
 
-
+#define SHOW_FPS 1
 
 
 
@@ -67,7 +68,7 @@ void load_cart_rom_file(char *filename) {
     FIL fil;
     FRESULT fr;
 
-    size_t bufsize = sizeof(SCREEN);
+    size_t bufsize = 4096;
     BYTE *buffer = (BYTE *) SCREEN;
     auto ofs = FLASH_TARGET_OFFSET;
     printf("Writing %s rom to flash %x\r\n", filename, ofs);
@@ -365,7 +366,7 @@ static void handle_input() {
 
 #if ENABLE_SOUND
 i2s_config_t i2s_config;
-#define AUDIO_FREQ (22050)
+#define AUDIO_FREQ (44100)
 #define SAMPLES 4096
 static struct SMS_ApuSample sms_audio_samples[SAMPLES];
 
@@ -399,7 +400,7 @@ int main() {
 #if ENABLE_SOUND
     i2s_config = i2s_get_default_config();
     i2s_config.sample_freq = AUDIO_FREQ;
-    i2s_config.dma_trans_count = i2s_config.sample_freq / 20;
+    i2s_config.dma_trans_count = i2s_config.sample_freq / 30;
     i2s_volume(&i2s_config, 0);
     i2s_init(&i2s_config);
 #endif
