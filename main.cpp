@@ -188,10 +188,9 @@ void rom_file_selector() {
     draw_text(filenames[selected], 0, selected, 0xFF, 0xF8);
 
     while (true) {
-
-
         nespad_read();
-        sleep_ms(100);
+        sleep_ms(33);
+        nespad_read();
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
