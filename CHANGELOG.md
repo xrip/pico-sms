@@ -1,3 +1,7 @@
+# v0.2.2
+
+Global button swap
+
 # v0.2.1
 
 Sega GameGear buttons swap
