@@ -269,14 +269,10 @@ static void handle_input() {
     SMS_set_port_a(&sms, JOY1_LEFT_BUTTON, (nespad_state & DPAD_LEFT) != 0);
     SMS_set_port_a(&sms, JOY1_RIGHT_BUTTON, (nespad_state & DPAD_RIGHT) != 0);
     SMS_set_port_b(&sms, RESET_BUTTON, (nespad_state & DPAD_SELECT) != 0);
+    SMS_set_port_a(&sms, JOY1_A_BUTTON, (nespad_state & DPAD_B) != 0);
+    SMS_set_port_a(&sms, JOY1_B_BUTTON, (nespad_state & DPAD_A) != 0);
     if (is_gg) {
-        SMS_set_port_a(&sms, JOY1_A_BUTTON, (nespad_state & DPAD_B) != 0);
-        SMS_set_port_a(&sms, JOY1_B_BUTTON, (nespad_state & DPAD_A) != 0);
         SMS_set_port_b(&sms, PAUSE_BUTTON, (nespad_state & DPAD_START) != 0);
-    } else {
-        SMS_set_port_a(&sms, JOY1_A_BUTTON, (nespad_state & DPAD_A) != 0);
-        SMS_set_port_a(&sms, JOY1_B_BUTTON, (nespad_state & DPAD_B) != 0);
-
     }
 }
 #define X2(a) (a | (a << 8))
