@@ -24,18 +24,19 @@
 #include "f_util.h"
 #include "ff.h"
 #include "VGA_ROM_F16.h"
+
 #pragma GCC optimize("Ofast")
 
 #define FLASH_TARGET_OFFSET (1024 * 1024)
-const char *rom_filename = (const char*) (XIP_BASE + FLASH_TARGET_OFFSET);
-const uint8_t *rom = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET)+4096;
+const char *rom_filename = (const char *) (XIP_BASE + FLASH_TARGET_OFFSET);
+const uint8_t *rom = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET) + 4096;
 
 static size_t rom_size = 0;
 static FATFS fs;
 
 #define SHOW_FPS 1
 
-
+bool is_gg = false;
 
 static struct SMS_Core sms = { 0 };
 static const sVmode *vmode = nullptr;
@@ -93,9 +94,9 @@ void load_cart_rom_file(char *filename) {
         flash_range_program(ofs, reinterpret_cast<const uint8_t *>(filename), 256);
 
 
-
         ofs += 4096;
         for (;;) {
+            gpio_put(PICO_DEFAULT_LED_PIN, true);
             fr = f_read(&fil, buffer, bufsize, &bytesRead);
             if (fr == FR_OK) {
                 if (bytesRead == 0) {
@@ -105,6 +106,7 @@ void load_cart_rom_file(char *filename) {
                 printf("Flashing %d bytes to flash address %x\r\n", bytesRead, ofs);
 
                 printf("Erasing...");
+                gpio_put(PICO_DEFAULT_LED_PIN, false);
                 // Disable interupts, erase, flash and enable interrupts
                 flash_range_erase(ofs, bufsize);
                 printf("  -> Flashing...\r\n");
@@ -153,7 +155,7 @@ uint16_t rom_file_selector_display_page(char filename[28][256], uint16_t num_pag
 
     /* search *.gb files */
     uint16_t num_file = 0;
-    fr = f_findfirst(&dj, &fno, "SMS\\", "*.sms");
+    fr = f_findfirst(&dj, &fno, "SMS\\", "*");
 
     /* skip the first N pages */
     if (num_page > 0) {
@@ -205,14 +207,14 @@ void rom_file_selector() {
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
-        if ((nespad_state & 0x04) != 0 || (nespad_state & 0x01) != 0 || (nespad_state & 0x02) != 0) {
+        if ((nespad_state & DPAD_A) != 0 || (nespad_state & DPAD_B) != 0 || (nespad_state & DPAD_START) != 0) {
             /* copy the rom from the SD card to flash and start the game */
             char pathname[255];
             sprintf(pathname, "SMS\\%s", filenames[selected]);
             load_cart_rom_file(pathname);
             break;
         }
-        if ((nespad_state & 0x20) != 0) {
+        if ((nespad_state & DPAD_DOWN) != 0) {
             /* select the next rom */
             draw_text(filenames[selected], 0, selected, 0xFF, 0x00);
             selected++;
@@ -221,7 +223,7 @@ void rom_file_selector() {
             draw_text(filenames[selected], 0, selected, 0xFF, 0xF8);
             sleep_ms(150);
         }
-        if ((nespad_state & 0x10) != 0) {
+        if ((nespad_state & DPAD_UP) != 0) {
             /* select the previous rom */
             draw_text(filenames[selected], 0, selected, 0xFF, 0x00);
             if (selected == 0) {
@@ -232,7 +234,7 @@ void rom_file_selector() {
             draw_text(filenames[selected], 0, selected, 0xFF, 0xF8);
             sleep_ms(150);
         }
-        if ((nespad_state & 0x80) != 0) {
+        if ((nespad_state & DPAD_RIGHT) != 0) {
             /* select the next page */
             num_page++;
             numfiles = rom_file_selector_display_page(filenames, num_page);
@@ -246,7 +248,7 @@ void rom_file_selector() {
             draw_text(filenames[selected], 0, selected, 0xFF, 0xF8);
             sleep_ms(150);
         }
-        if ((nespad_state & 0x40) != 0 && num_page > 0) {
+        if ((nespad_state & DPAD_LEFT) != 0 && num_page > 0) {
             /* select the previous page */
             num_page--;
             numfiles = rom_file_selector_display_page(filenames, num_page);
@@ -259,8 +261,22 @@ void rom_file_selector() {
     }
 }
 
+static void handle_input() {
+    nespad_read();
 
+    SMS_set_port_a(&sms, JOY1_DOWN_BUTTON, (nespad_state & DPAD_DOWN) != 0);
+    SMS_set_port_a(&sms, JOY1_UP_BUTTON, (nespad_state & DPAD_UP) != 0);
+    SMS_set_port_a(&sms, JOY1_LEFT_BUTTON, (nespad_state & DPAD_LEFT) != 0);
+    SMS_set_port_a(&sms, JOY1_RIGHT_BUTTON, (nespad_state & DPAD_RIGHT) != 0);
+    SMS_set_port_a(&sms, JOY1_A_BUTTON, (nespad_state & DPAD_A) != 0);
+    SMS_set_port_a(&sms, JOY1_B_BUTTON, (nespad_state & DPAD_B) != 0);
+    SMS_set_port_b(&sms, RESET_BUTTON, (nespad_state & DPAD_SELECT) != 0);
+    if (is_gg) {
+        SMS_set_port_b(&sms, PAUSE_BUTTON, (nespad_state & DPAD_START) != 0);
+    }
+}
 #define X2(a) (a | (a << 8))
+#define X4(a) (a | (a << 8) | (a << 16) | (a << 24))
 #define CHECK_BIT(var, pos) (((var)>>(pos)) & 1)
 
 /* Renderer loop on Pico's second core */
@@ -281,12 +297,12 @@ void __time_critical_func(render_loop)() {
                     uint8_t glyph_row = VGA_ROM_F16[(textmode[y / 16][x] * 16) + y % 16];
                     uint8_t color = colors[y / 16][x];
 
-                        for (uint8_t bit = 0; bit < 8; bit++) {
-                            if (CHECK_BIT(glyph_row, bit)) {
-                                // FOREGROUND
+                    for (uint8_t bit = 0; bit < 8; bit++) {
+                        if (CHECK_BIT(glyph_row, bit)) {
+                            // FOREGROUND
                             linebuf->line[8 * x + bit] = (color >> 4) & 0xF;
-                            } else {
-                                // BACKGROUND
+                        } else {
+                            // BACKGROUND
                             linebuf->line[8 * x + bit] = color & 0xF;
                         }
                     }
@@ -322,6 +338,7 @@ void __time_critical_func(render_loop)() {
 }
 // We get 6 bit RGB values, pack them into a byte swapped RGB565 value
 #define VGA_RGB_222(r, g, b) ((r << 4) | (g << 2) | b)
+
 __attribute__((always_inline)) inline uint32_t core_colour_callback(void *user, uint8_t r, uint8_t g, uint8_t b) {
 //    (void) user;
 
@@ -340,39 +357,21 @@ __attribute__((always_inline)) inline uint32_t core_colour_callback(void *user, 
 uint_fast32_t frames = 0;
 uint64_t start_time;
 #define FRAME_SKIP (1)
+
 static void core_vblank_callback(void *user) {
     //(void) user;
     frames++;
     static int fps_skip_counter = FRAME_SKIP;
 
-    if (fps_skip_counter > 0)
-    {
+    if (fps_skip_counter > 0) {
         fps_skip_counter--;
         SMS_skip_frame(&sms, true);
         return;
-    }
-    else
-    {
+    } else {
         fps_skip_counter = FRAME_SKIP;
         SMS_skip_frame(&sms, false);
     }
-
 }
-
-static void handle_input() {
-    nespad_read();
-
-
-    SMS_set_port_a(&sms, JOY1_DOWN_BUTTON, (nespad_state & 0x20) != 0);
-    SMS_set_port_a(&sms, JOY1_UP_BUTTON, (nespad_state & 0x10) != 0);
-    SMS_set_port_a(&sms, JOY1_LEFT_BUTTON, (nespad_state & 0x40) != 0);
-    SMS_set_port_a(&sms, JOY1_RIGHT_BUTTON,  (nespad_state & 0x80) != 0);
-    SMS_set_port_a(&sms, JOY1_A_BUTTON, (nespad_state & 0x01) != 0);
-    SMS_set_port_a(&sms, JOY1_B_BUTTON, (nespad_state & 0x02) != 0);
-    SMS_set_port_b(&sms, RESET_BUTTON, (nespad_state & 0x04) != 0);
-    SMS_set_port_b(&sms, PAUSE_BUTTON, (nespad_state & 0x08) != 0);
-}
-
 
 #if ENABLE_SOUND
 i2s_config_t i2s_config;
@@ -382,7 +381,7 @@ static struct SMS_ApuSample sms_audio_samples[SAMPLES];
 
 __attribute__((always_inline)) inline void core_audio_callback(void* user, struct SMS_ApuSample* samples, uint32_t size) {
     (void)user;
-    static int_fast16_t audio_buffer[SAMPLES*2];
+    static int16_t audio_buffer[SAMPLES*2];
     SMS_apu_mixer_s16(samples, reinterpret_cast<int16_t *>(audio_buffer), size);
     i2s_dma_write(&i2s_config, reinterpret_cast<const int16_t *>(audio_buffer));
 }
@@ -392,33 +391,18 @@ int main() {
     vreg_set_voltage(VREG_VOLTAGE_1_15);
     set_sys_clock_khz(288000, true);
 
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+
+#if !NDEBUG
+    stdio_init_all();
+#endif
+
     sleep_ms(50);
     vmode = Video(DEV_VGA, RES_HVGA);
     sleep_ms(50);
 
-    //stdio_init_all();
-
-//    sleep_ms(3000);
     nespad_begin(clock_get_hz(clk_sys) / 1000, NES_GPIO_CLK, NES_GPIO_DATA, NES_GPIO_LAT);
-
-    // util::dumpMemory((void *)NES_FILE_ADDR, 1024);
-    sem_init(&vga_start_semaphore, 0, 1);
-    multicore_launch_core1(render_loop);
-    sem_release(&vga_start_semaphore);
-
-    sleep_ms(100);
-#if ENABLE_SOUND
-    i2s_config = i2s_get_default_config();
-    i2s_config.sample_freq = AUDIO_FREQ;
-    i2s_config.dma_trans_count = i2s_config.sample_freq / 30;
-    i2s_volume(&i2s_config, 0);
-    i2s_init(&i2s_config);
-#endif
-
-    rom_file_selector();
-    memset(&textmode, 0x00, sizeof(textmode));
-    memset(&colors, 0x00, sizeof(colors));
-    resolution = RESOLUTION_NATIVE;
 
     if (!SMS_init(&sms)) {
         printf("Failed to init SMS");
@@ -428,25 +412,40 @@ int main() {
     SMS_set_vblank_callback(&sms, core_vblank_callback);
 
 #if ENABLE_SOUND
+    i2s_config = i2s_get_default_config();
+    i2s_config.sample_freq = AUDIO_FREQ;
+    i2s_config.dma_trans_count = i2s_config.sample_freq / 20;
+    i2s_volume(&i2s_config, 0);
+    i2s_init(&i2s_config);
     SMS_set_apu_callback(&sms, core_audio_callback, sms_audio_samples, sizeof(sms_audio_samples)/sizeof(sms_audio_samples[0]), AUDIO_FREQ);
 #endif
     SMS_set_pixels(&sms, &SCREEN, SMS_SCREEN_WIDTH, 8);
 
-    //mgb_init(&sms);
+    sem_init(&vga_start_semaphore, 0, 1);
+    multicore_launch_core1(render_loop);
+    sem_release(&vga_start_semaphore);
 
-    if (!SMS_loadrom(&sms, rom, rom_size, SMS_System_SMS)) {
+    rom_file_selector();
+    memset(&textmode, 0x00, sizeof(textmode));
+    memset(&colors, 0x00, sizeof(colors));
+    resolution = RESOLUTION_NATIVE;
+
+
+    is_gg = strstr(rom_filename, ".gg") != nullptr;
+
+    if (!SMS_loadrom(&sms, rom, rom_size, is_gg ? SMS_System_GG : SMS_System_SMS)) {
         printf("Failed running rom\r\n");
     } else {
-            printf("ROM loaded %s size %i", rom_filename, rom_size);
+        printf("ROM loaded %s size %i", rom_filename, rom_size);
     }
 
     start_time = time_us_64();
 
-    for (;;) {
+    while (true) {
         handle_input();
         SMS_run(&sms, SMS_CYCLES_PER_FRAME);
 #if SHOW_FPS
-            if (frames == 60) {
+        if (frames == 60) {
             uint64_t end_time;
             uint32_t diff;
             uint8_t fps;
@@ -456,16 +455,10 @@ int main() {
             char fps_text[3];
             sprintf(fps_text, "%i", fps);
             draw_text(fps_text, 77, 0, 0xFF, 0x00);
-
-/*            printf("Frames: %u\r\n"
-                   "Time: %lu us\r\n"
-                   "FPS: %lu\r\n",
-                   frames, diff, fps);
-                   */
-            //stdio_flush();
             frames = 0;
             start_time = time_us_64();
         }
 #endif
+        tight_loop_contents();
     }
 }
