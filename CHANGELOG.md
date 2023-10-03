@@ -1,5 +1,9 @@
 # v0.2.0
 
+Sega GameGear buttons swap
+
+# v0.2.0
+
 Sega GameGear support
 
 # v0.1.2
