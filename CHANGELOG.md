@@ -1,3 +1,7 @@
+# v0.2.0
+
+Sega GameGear support
+
 # v0.1.2
 
 Double keypress in menu fix
