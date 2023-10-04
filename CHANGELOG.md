@@ -1,3 +1,7 @@
+# v1.0.0
+
+Massive speedup without frameskip
+
 # v0.2.2
 
 Global button swap
