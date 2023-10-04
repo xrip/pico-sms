@@ -356,7 +356,7 @@ __attribute__((always_inline)) inline uint32_t core_colour_callback(void *user, 
 
 uint_fast32_t frames = 0;
 uint64_t start_time;
-#define FRAME_SKIP (1)
+#define FRAME_SKIP (0)
 
 static void core_vblank_callback(void *user) {
     //(void) user;
