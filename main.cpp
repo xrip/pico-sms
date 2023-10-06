@@ -15,7 +15,7 @@
 #include "pico/multicore.h"
 #include "sms.h"
 #include "vga.h"
-
+#define ENABLE_SOUND 1
 #if ENABLE_SOUND
 #include "audio.h"
 #endif
@@ -72,7 +72,7 @@ void load_cart_rom_file(char *filename) {
     FIL fil;
     FRESULT fr;
 
-    size_t bufsize = sizeof SCREEN;
+    size_t bufsize = sizeof(SCREEN)&0xfffff000;
     BYTE *buffer = (BYTE *) SCREEN;
     auto ofs = FLASH_TARGET_OFFSET;
 
@@ -207,6 +207,9 @@ void rom_file_selector() {
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
+        if ((nespad_state & DPAD_SELECT) != 0) {
+            break;
+        }
         if ((nespad_state & DPAD_A) != 0 || (nespad_state & DPAD_B) != 0 || (nespad_state & DPAD_START) != 0) {
             /* copy the rom from the SD card to flash and start the game */
             char pathname[255];
@@ -375,7 +378,7 @@ static void core_vblank_callback(void *user) {
 
 #if ENABLE_SOUND
 i2s_config_t i2s_config;
-#define AUDIO_FREQ (44100)
+#define AUDIO_FREQ (22050)
 #define SAMPLES 4096
 static struct SMS_ApuSample sms_audio_samples[SAMPLES];
 
@@ -388,12 +391,21 @@ __attribute__((always_inline)) inline void core_audio_callback(void* user, struc
 #endif
 
 int main() {
-    vreg_set_voltage(VREG_VOLTAGE_1_15);
-    set_sys_clock_khz(288000, true);
+    /* Overclock. */
+    hw_set_bits(&vreg_and_chip_reset_hw->vreg, VREG_AND_CHIP_RESET_VREG_VSEL_BITS);
+    sleep_ms(33);
+
+    set_sys_clock_khz(396 * 1000, true);
 
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 
+    for (int i = 0; i < 6; i++) {
+        sleep_ms(33);
+        gpio_put(PICO_DEFAULT_LED_PIN, true);
+        sleep_ms(33);
+        gpio_put(PICO_DEFAULT_LED_PIN, false);
+    }
 #if !NDEBUG
     stdio_init_all();
 #endif
@@ -414,7 +426,7 @@ int main() {
 #if ENABLE_SOUND
     i2s_config = i2s_get_default_config();
     i2s_config.sample_freq = AUDIO_FREQ;
-    i2s_config.dma_trans_count = i2s_config.sample_freq / 20;
+    i2s_config.dma_trans_count = sizeof(sms_audio_samples)/sizeof(sms_audio_samples[0]);
     i2s_volume(&i2s_config, 0);
     i2s_init(&i2s_config);
     SMS_set_apu_callback(&sms, core_audio_callback, sms_audio_samples, sizeof(sms_audio_samples)/sizeof(sms_audio_samples[0]), AUDIO_FREQ);
