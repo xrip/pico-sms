@@ -54,9 +54,22 @@ add_executable(sms
 
 pico_set_program_name(sms "sms Emulator for MURMULATOR devboard")
 pico_set_program_version(sms "v0.1")
-pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
-target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
-pico_set_boot_stage2(${PROJECT_NAME} slower_boot2)
+
+if(OVERCLOCKING)
+    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME  "${PROJECT_NAME}-${OVERCLOCKING}MHz")
+
+    target_compile_definitions(${PROJECT_NAME} PRIVATE OVERCLOCKING=${OVERCLOCKING})
+
+    pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
+    target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
+    pico_set_boot_stage2(${PROJECT_NAME} slower_boot2)
+
+    message(STATUS "==================================")
+    message(STATUS "Overclocking ${OVERCLOCKING}MHz enabled")
+    message(STATUS "==================================")
+    message(STATUS "")
+endif ()
+
 
 target_include_directories(sms PRIVATE TotalSMS)
 

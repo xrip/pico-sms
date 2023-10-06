@@ -1,3 +1,8 @@
+# v1.0.1
+
+Sound enabled. Realy usable only near to maximum overclock.
+Release with different overclocking profiles. 
+
 # v1.0.0
 
 Massive speedup without frameskip
