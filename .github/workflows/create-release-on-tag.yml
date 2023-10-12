@@ -56,7 +56,7 @@ jobs:
           cmake -DOVERCLOCKING=346 .. && make && \
           cmake -DOVERCLOCKING=366 .. && make && \
           cmake -DOVERCLOCKING=396 .. && make && \
-          cmake -DOVERCLOCKING=412 .. && make && \\
+          cmake -DOVERCLOCKING=412 .. && make && \
           cmake -DOVERCLOCKING=416 .. && make
 
 
