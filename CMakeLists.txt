@@ -42,6 +42,7 @@ MARK_AS_ADVANCED(
 
 add_subdirectory(TotalSMS)
 add_subdirectory(drivers/audio)
+add_subdirectory(drivers/ps2kbd)
 add_subdirectory(drivers/vga)
 add_subdirectory(drivers/nespad)
 add_subdirectory(drivers/fatfs)
@@ -52,8 +53,8 @@ add_executable(sms
         main.cpp
 )
 
-pico_set_program_name(sms "sms Emulator for MURMULATOR devboard")
-pico_set_program_version(sms "v0.1")
+pico_set_program_name(sms "Sega Master System/GameGear emulator by xrip for MURMULATOR devboard")
+pico_set_program_version(sms "dev")
 
 if(OVERCLOCKING)
     set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME  "${PROJECT_NAME}-${OVERCLOCKING}MHz")
@@ -74,7 +75,7 @@ endif ()
 target_include_directories(sms PRIVATE TotalSMS)
 
 pico_enable_stdio_uart(sms 0)
-pico_enable_stdio_usb(sms 0)
+pico_enable_stdio_usb(sms 1)
 
 target_link_libraries(sms PRIVATE
         TotalSMS
@@ -84,6 +85,7 @@ target_link_libraries(sms PRIVATE
         sdcard
         fatfs
         nespad
+        ps2kbd
 
         pico_runtime
         pico_stdlib

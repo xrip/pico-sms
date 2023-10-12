@@ -15,15 +15,23 @@
 #include "pico/multicore.h"
 #include "sms.h"
 #include "vga.h"
+
 #define ENABLE_SOUND 1
 #if ENABLE_SOUND
+
 #include "audio.h"
+
 #endif
 
 #include "nespad.h"
 #include "f_util.h"
 #include "ff.h"
 #include "VGA_ROM_F16.h"
+#include "ps2kbd_mrmltr.h"
+
+#ifndef OVERCLOCKING
+#define OVERCLOCKING 270
+#endif
 
 #pragma GCC optimize("Ofast")
 
@@ -45,6 +53,66 @@ struct semaphore vga_start_semaphore;
 uint8_t SCREEN[SMS_SCREEN_WIDTH * SMS_SCREEN_HEIGHT];
 char textmode[30][80];
 uint8_t colors[30][80];
+
+struct input_bits_t {
+    bool a: true;
+    bool b: true;
+    bool select: true;
+    bool start: true;
+    bool right: true;
+    bool left: true;
+    bool up: true;
+    bool down: true;
+};
+static input_bits_t keyboard_bits = {false, false, false, false, false, false, false, false};
+static input_bits_t gamepad1_bits = {false, false, false, false, false, false, false, false};
+static input_bits_t gamepad2_bits = {false, false, false, false, false, false, false, false};
+
+void nespad_tick() {
+    nespad_read();
+
+    gamepad1_bits.a = (nespad_state & DPAD_A) != 0;
+    gamepad1_bits.b = (nespad_state & DPAD_B) != 0;
+    gamepad1_bits.select = (nespad_state & DPAD_SELECT) != 0;
+    gamepad1_bits.start = (nespad_state & DPAD_START) != 0;
+    gamepad1_bits.up = (nespad_state & DPAD_UP) != 0;
+    gamepad1_bits.down = (nespad_state & DPAD_DOWN) != 0;
+    gamepad1_bits.left = (nespad_state & DPAD_LEFT) != 0;
+    gamepad1_bits.right = (nespad_state & DPAD_RIGHT) != 0;
+
+}
+
+static bool isInReport(hid_keyboard_report_t const *report, const unsigned char keycode) {
+    for (unsigned char i: report->keycode) {
+        if (i == keycode) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void
+__not_in_flash_func(process_kbd_report)(hid_keyboard_report_t const *report, hid_keyboard_report_t const *prev_report) {
+    /* printf("HID key report modifiers %2.2X report ", report->modifier);
+    for (unsigned char i: report->keycode)
+        printf("%2.2X", i);
+    printf("\r\n");
+     */
+    keyboard_bits.start = isInReport(report, HID_KEY_ENTER);
+    keyboard_bits.select = isInReport(report, HID_KEY_BACKSPACE);
+    keyboard_bits.a = isInReport(report, HID_KEY_Z);
+    keyboard_bits.b = isInReport(report, HID_KEY_X);
+    keyboard_bits.up = isInReport(report, HID_KEY_ARROW_UP);
+    keyboard_bits.down = isInReport(report, HID_KEY_ARROW_DOWN);
+    keyboard_bits.left = isInReport(report, HID_KEY_ARROW_LEFT);
+    keyboard_bits.right = isInReport(report, HID_KEY_ARROW_RIGHT);
+    //-------------------------------------------------------------------------
+}
+
+Ps2Kbd_Mrmltr ps2kbd(
+        pio1,
+        0,
+        process_kbd_report);
 
 typedef enum {
     RESOLUTION_NATIVE,
@@ -72,7 +140,7 @@ void load_cart_rom_file(char *filename) {
     FIL fil;
     FRESULT fr;
 
-    size_t bufsize = sizeof(SCREEN)&0xfffff000;
+    size_t bufsize = sizeof(SCREEN) & 0xfffff000;
     BYTE *buffer = (BYTE *) SCREEN;
     auto ofs = FLASH_TARGET_OFFSET;
 
@@ -201,23 +269,27 @@ void rom_file_selector() {
     draw_text(filenames[selected], 0, selected, 0xFF, 0xF8);
 
     while (true) {
-        nespad_read();
+        ps2kbd.tick();
+        nespad_tick();
         sleep_ms(33);
-        nespad_read();
+        nespad_tick();
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
-        if ((nespad_state & DPAD_SELECT) != 0) {
+        if (keyboard_bits.select || gamepad1_bits.select) {
+            gpio_put(PICO_DEFAULT_LED_PIN, true);
             break;
         }
-        if ((nespad_state & DPAD_A) != 0 || (nespad_state & DPAD_B) != 0 || (nespad_state & DPAD_START) != 0) {
+
+        if (keyboard_bits.start || gamepad1_bits.start || gamepad1_bits.a || gamepad1_bits.b) {
             /* copy the rom from the SD card to flash and start the game */
             char pathname[255];
             sprintf(pathname, "SMS\\%s", filenames[selected]);
             load_cart_rom_file(pathname);
             break;
         }
-        if ((nespad_state & DPAD_DOWN) != 0) {
+
+        if (keyboard_bits.down || gamepad1_bits.down) {
             /* select the next rom */
             draw_text(filenames[selected], 0, selected, 0xFF, 0x00);
             selected++;
@@ -226,7 +298,8 @@ void rom_file_selector() {
             draw_text(filenames[selected], 0, selected, 0xFF, 0xF8);
             sleep_ms(150);
         }
-        if ((nespad_state & DPAD_UP) != 0) {
+
+        if (keyboard_bits.up || gamepad1_bits.up) {
             /* select the previous rom */
             draw_text(filenames[selected], 0, selected, 0xFF, 0x00);
             if (selected == 0) {
@@ -237,7 +310,8 @@ void rom_file_selector() {
             draw_text(filenames[selected], 0, selected, 0xFF, 0xF8);
             sleep_ms(150);
         }
-        if ((nespad_state & DPAD_RIGHT) != 0) {
+
+        if (keyboard_bits.right || gamepad1_bits.right) {
             /* select the next page */
             num_page++;
             numfiles = rom_file_selector_display_page(filenames, num_page);
@@ -251,7 +325,8 @@ void rom_file_selector() {
             draw_text(filenames[selected], 0, selected, 0xFF, 0xF8);
             sleep_ms(150);
         }
-        if ((nespad_state & DPAD_LEFT) != 0 && num_page > 0) {
+
+        if ((keyboard_bits.left || gamepad1_bits.left) && num_page > 0) {
             /* select the previous page */
             num_page--;
             numfiles = rom_file_selector_display_page(filenames, num_page);
@@ -265,19 +340,21 @@ void rom_file_selector() {
 }
 
 static void handle_input() {
-    nespad_read();
+    nespad_tick();
+    ps2kbd.tick();
 
-    SMS_set_port_a(&sms, JOY1_DOWN_BUTTON, (nespad_state & DPAD_DOWN) != 0);
-    SMS_set_port_a(&sms, JOY1_UP_BUTTON, (nespad_state & DPAD_UP) != 0);
-    SMS_set_port_a(&sms, JOY1_LEFT_BUTTON, (nespad_state & DPAD_LEFT) != 0);
-    SMS_set_port_a(&sms, JOY1_RIGHT_BUTTON, (nespad_state & DPAD_RIGHT) != 0);
-    SMS_set_port_b(&sms, RESET_BUTTON, (nespad_state & DPAD_SELECT) != 0);
-    SMS_set_port_a(&sms, JOY1_A_BUTTON, (nespad_state & DPAD_B) != 0);
-    SMS_set_port_a(&sms, JOY1_B_BUTTON, (nespad_state & DPAD_A) != 0);
+    SMS_set_port_a(&sms, JOY1_DOWN_BUTTON, keyboard_bits.down || gamepad1_bits.down);
+    SMS_set_port_a(&sms, JOY1_UP_BUTTON, keyboard_bits.up || gamepad1_bits.up);
+    SMS_set_port_a(&sms, JOY1_LEFT_BUTTON, keyboard_bits.left || gamepad1_bits.left);
+    SMS_set_port_a(&sms, JOY1_RIGHT_BUTTON, keyboard_bits.right || gamepad1_bits.right);
+    SMS_set_port_b(&sms, RESET_BUTTON, keyboard_bits.select || gamepad1_bits.select);
+    SMS_set_port_a(&sms, JOY1_A_BUTTON, keyboard_bits.a || gamepad1_bits.a);
+    SMS_set_port_a(&sms, JOY1_B_BUTTON, keyboard_bits.b || gamepad1_bits.b);
     if (is_gg) {
-        SMS_set_port_b(&sms, PAUSE_BUTTON, (nespad_state & DPAD_START) != 0);
+        SMS_set_port_b(&sms, PAUSE_BUTTON, keyboard_bits.start || gamepad1_bits.start);
     }
 }
+
 #define X2(a) (a | (a << 8))
 #define X4(a) (a | (a << 8) | (a << 16) | (a << 24))
 #define CHECK_BIT(var, pos) (((var)>>(pos)) & 1)
@@ -359,7 +436,7 @@ __attribute__((always_inline)) inline uint32_t core_colour_callback(void *user, 
 
 uint_fast32_t frames = 0;
 uint64_t start_time;
-#define FRAME_SKIP (0)
+#define FRAME_SKIP (OVERCLOCKING < 366 ? 1 : 0)
 
 static void core_vblank_callback(void *user) {
     //(void) user;
@@ -382,12 +459,14 @@ i2s_config_t i2s_config;
 #define SAMPLES 4096
 static struct SMS_ApuSample sms_audio_samples[SAMPLES];
 
-__attribute__((always_inline)) inline void core_audio_callback(void* user, struct SMS_ApuSample* samples, uint32_t size) {
-    (void)user;
-    static int16_t audio_buffer[SAMPLES*2];
+__attribute__((always_inline)) inline void
+core_audio_callback(void *user, struct SMS_ApuSample *samples, uint32_t size) {
+    (void) user;
+    static int16_t audio_buffer[SAMPLES * 2];
     SMS_apu_mixer_s16(samples, reinterpret_cast<int16_t *>(audio_buffer), size);
     i2s_dma_write(&i2s_config, reinterpret_cast<const int16_t *>(audio_buffer));
 }
+
 #endif
 
 int main() {
@@ -395,7 +474,7 @@ int main() {
     hw_set_bits(&vreg_and_chip_reset_hw->vreg, VREG_AND_CHIP_RESET_VREG_VSEL_BITS);
     sleep_ms(33);
 
-    set_sys_clock_khz(396 * 1000, true);
+    set_sys_clock_khz(OVERCLOCKING * 1000, true);
 
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
@@ -414,6 +493,7 @@ int main() {
     vmode = Video(DEV_VGA, RES_HVGA);
     sleep_ms(50);
 
+    ps2kbd.init_gpio();
     nespad_begin(clock_get_hz(clk_sys) / 1000, NES_GPIO_CLK, NES_GPIO_DATA, NES_GPIO_LAT);
 
     if (!SMS_init(&sms)) {
@@ -426,10 +506,11 @@ int main() {
 #if ENABLE_SOUND
     i2s_config = i2s_get_default_config();
     i2s_config.sample_freq = AUDIO_FREQ;
-    i2s_config.dma_trans_count = sizeof(sms_audio_samples)/sizeof(sms_audio_samples[0]);
+    i2s_config.dma_trans_count = sizeof(sms_audio_samples) / sizeof(sms_audio_samples[0]);
     i2s_volume(&i2s_config, 0);
     i2s_init(&i2s_config);
-    SMS_set_apu_callback(&sms, core_audio_callback, sms_audio_samples, sizeof(sms_audio_samples)/sizeof(sms_audio_samples[0]), AUDIO_FREQ);
+    SMS_set_apu_callback(&sms, core_audio_callback, sms_audio_samples,
+                         sizeof(sms_audio_samples) / sizeof(sms_audio_samples[0]), AUDIO_FREQ);
 #endif
     SMS_set_pixels(&sms, &SCREEN, SMS_SCREEN_WIDTH, 8);
 

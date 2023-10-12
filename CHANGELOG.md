@@ -1,3 +1,7 @@
+# v1.1.0
+
+PS2 keyboard support
+
 # v1.0.1
 
 Sound enabled. Realy usable only near to maximum overclock.
