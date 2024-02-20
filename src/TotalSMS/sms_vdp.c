@@ -10,7 +10,7 @@
 
 
 #define VDP sms->vdp
-
+#define SMS_PIXEL_WIDTH 8
 #ifndef SMS_PIXEL_WIDTH
     typedef uint32_t pixel_width_t;
 #else
