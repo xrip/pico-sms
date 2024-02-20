@@ -611,7 +611,7 @@ void __scratch_x("render") render_core() {
     graphics_set_bgcolor(0x000000);
     graphics_set_offset(32, 24);
 
-    graphics_set_flashmode(false, false);
+    graphics_set_flashmode(true, true);
     sem_acquire_blocking(&vga_start_semaphore);
 
     // 60 FPS loop
