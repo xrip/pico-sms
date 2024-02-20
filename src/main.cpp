@@ -21,9 +21,8 @@ const uint8_t* rom = (const uint8_t *)(XIP_BASE + FLASH_TARGET_OFFSET);
 bool __uninitialized_ram(is_gg) = false;
 static size_t __uninitialized_ram(rom_size) = 0;
 static FATFS fs;
-
-
-
+bool reboot = false;
+bool frameskip = true;
 static SMS_Core sms = { };
 semaphore vga_start_semaphore;
 
@@ -90,11 +89,12 @@ Ps2Kbd_Mrmltr ps2kbd(
     process_kbd_report);
 
 static void handle_input() {
+
     SMS_set_port_a(&sms, JOY1_DOWN_BUTTON, keyboard_bits.down || gamepad1_bits.down);
     SMS_set_port_a(&sms, JOY1_UP_BUTTON, keyboard_bits.up || gamepad1_bits.up);
     SMS_set_port_a(&sms, JOY1_LEFT_BUTTON, keyboard_bits.left || gamepad1_bits.left);
     SMS_set_port_a(&sms, JOY1_RIGHT_BUTTON, keyboard_bits.right || gamepad1_bits.right);
-    SMS_set_port_b(&sms, RESET_BUTTON, keyboard_bits.select || gamepad1_bits.select);
+    // SMS_set_port_b(&sms, RESET_BUTTON, keyboard_bits.select || gamepad1_bits.select);
     SMS_set_port_a(&sms, JOY1_A_BUTTON, keyboard_bits.a || gamepad1_bits.a);
     SMS_set_port_a(&sms, JOY1_B_BUTTON, keyboard_bits.b || gamepad1_bits.b);
 
@@ -122,20 +122,17 @@ __attribute__((always_inline)) inline uint32_t core_colour_callback(uint8_t inde
 
 uint_fast32_t frames = 0;
 uint64_t start_time;
-#define FRAME_SKIP 1
 
 static __always_inline void core_vblank_callback(void* user) {
     //(void) user;
     frames++;
-    static int fps_skip_counter = FRAME_SKIP;
+    static int fps_skip_counter = frameskip ? 0 : 1;
 
     if (fps_skip_counter > 0) {
         fps_skip_counter--;
         SMS_skip_frame(&sms, true);
-        return;
-    }
-    else {
-        fps_skip_counter = FRAME_SKIP;
+    } else {
+        fps_skip_counter = frameskip ? 0 : 1;
         SMS_skip_frame(&sms, false);
     }
 }
@@ -239,6 +236,8 @@ bool filebrowser_loadfile(const char pathname[256]) {
     f_close(&file);
     multicore_lockout_end_blocking();
     // restore_interrupts(ints);
+
+    is_gg = strstr(pathname, ".gg") != nullptr;
     return true;
 }
 
@@ -433,6 +432,159 @@ void filebrowser(const char pathname[256], const char executables[11]) {
     }
 }
 
+enum menu_type_e {
+    EMPTY,
+    INT,
+    TEXT,
+    ARRAY,
+
+    OVERCLOCK,
+
+    SAVE,
+    LOAD,
+    ROM_SELECT,
+    RETURN,
+};
+
+typedef struct __attribute__((__packed__)) {
+    const char *text;
+    menu_type_e type;
+    const void *value;
+    uint8_t max_value;
+    char value_list[5][10];
+} MenuItem;
+
+uint16_t overclock[3] = { 378, 396, 416 };
+uint8_t overclock_v = 0;
+
+const MenuItem menu_items[] = {
+        // {"Player 1: %s",        ARRAY, &player_1_input, 2, {"Keyboard ", "Gamepad 1", "Gamepad 2"}},
+        {"Overclocking: %s",        OVERCLOCK, &overclock_v, 2, {"378 Mhz", "396 Mhz", "416 Mhz"}},
+    //{"Player 2: %s",        ARRAY, &player_2_input, 2, {"Keyboard ", "Gamepad 1", "Gamepad 2"}},
+        {""},
+        {"Frameskip: %s",     ARRAY, &frameskip,  1, {"NO ",       "YES"}},
+        // {"Limit fps: %s",     ARRAY, &limit_fps,    1, {"NO ",       "YES"}},
+        //{"Show fps: %s",     ARRAY, &show_fps,    1, {"NO ",       "YES"}},
+        {""},
+        {"Reset to ROM select", ROM_SELECT},
+        {"Return to game",      RETURN}
+};
+
+#define MENU_ITEMS_NUMBER (sizeof(menu_items) / sizeof (MenuItem))
+
+void menu() {
+    bool exit = false;
+    graphics_set_mode(TEXTMODE_DEFAULT);
+    char footer[TEXTMODE_COLS];
+    snprintf(footer, TEXTMODE_COLS, ":: %s ::", PICO_PROGRAM_NAME);
+    draw_text(footer, TEXTMODE_COLS / 2 - strlen(footer) / 2, 0, 11, 1);
+    snprintf(footer, TEXTMODE_COLS, ":: %s build %s %s ::", PICO_PROGRAM_VERSION_STRING, __DATE__,
+             __TIME__);
+    draw_text(footer, TEXTMODE_COLS / 2 - strlen(footer) / 2, TEXTMODE_ROWS - 1, 11, 1);
+    uint current_item = 0;
+
+    while (!exit) {
+        sleep_ms(25);
+        if (gamepad1_bits.down || keyboard_bits.down) {
+            current_item = (current_item + 1) % MENU_ITEMS_NUMBER;
+            if (menu_items[current_item].type == EMPTY)
+                current_item++;
+        }
+        if (gamepad1_bits.up || keyboard_bits.up) {
+            current_item = (current_item - 1 + MENU_ITEMS_NUMBER) % MENU_ITEMS_NUMBER;
+            if (menu_items[current_item].type == EMPTY)
+                current_item--;
+        }
+        for (int i = 0; i < MENU_ITEMS_NUMBER; i++) {
+            uint8_t y = i + (TEXTMODE_ROWS - MENU_ITEMS_NUMBER >> 1);
+            uint8_t x = TEXTMODE_COLS / 2 - 10;
+            uint8_t color = 0xFF;
+            uint8_t bg_color = 0x00;
+            if (current_item == i) {
+                color = 0x01;
+                bg_color = 0xFF;
+            }
+            const MenuItem* item = &menu_items[i];
+            if (i == current_item) {
+                switch (item->type) {
+                    case INT:
+                    case ARRAY:
+                        if (item->max_value != 0) {
+                            auto* value = (uint8_t *)item->value;
+                            if ((gamepad1_bits.right || keyboard_bits.right) && *value < item->max_value) {
+                                (*value)++;
+                            }
+                            if ((gamepad1_bits.left || keyboard_bits.left) && *value > 0) {
+                                (*value)--;
+                            }
+                        }
+                        break;
+                    case OVERCLOCK:
+                        if (item->max_value != 0) {
+                            auto* value = (uint8_t *)item->value;
+                            if ((gamepad1_bits.right || keyboard_bits.right) && *value < item->max_value) {
+                                (*value)++;
+                                hw_set_bits(&vreg_and_chip_reset_hw->vreg, VREG_AND_CHIP_RESET_VREG_VSEL_BITS);
+                                sleep_ms(10);
+                                set_sys_clock_khz(overclock[overclock_v] * KHZ, true);
+                            }
+                            if ((gamepad1_bits.left || keyboard_bits.left) && *value > 0) {
+                                (*value)--;
+                                hw_set_bits(&vreg_and_chip_reset_hw->vreg, VREG_AND_CHIP_RESET_VREG_VSEL_BITS);
+                                sleep_ms(10);
+                                set_sys_clock_khz(overclock[overclock_v] * KHZ, true);
+
+                            }
+                        }
+                        break;
+                    case SAVE:
+                        if (gamepad1_bits.start || keyboard_bits.start) {
+                            // save();
+                            exit = true;
+                        }
+                        break;
+                    case LOAD:
+                        if (gamepad1_bits.start || keyboard_bits.start) {
+                            // load();
+                            exit = true;
+                        }
+                        break;
+                    case RETURN:
+                        if (gamepad1_bits.start || keyboard_bits.start)
+                            exit = true;
+                        break;
+
+                    case ROM_SELECT:
+                        if (gamepad1_bits.start || keyboard_bits.start) {
+                            reboot = true;
+                            return;
+                        }
+                        break;
+                }
+            }
+            static char result[TEXTMODE_COLS];
+            switch (item->type) {
+                case INT:
+                    snprintf(result, TEXTMODE_COLS, item->text, *(uint8_t *)item->value);
+                    break;
+                case ARRAY:
+                case OVERCLOCK:
+                    snprintf(result, TEXTMODE_COLS, item->text, item->value_list[*(uint8_t *)item->value]);
+                    break;
+                case TEXT:
+                    snprintf(result, TEXTMODE_COLS, item->text, item->value);
+                    break;
+                default:
+                    snprintf(result, TEXTMODE_COLS, "%s", item->text);
+            }
+            draw_text(result, x, y, color, bg_color);
+        }
+        sleep_ms(100);
+    }
+
+    graphics_set_mode(GRAPHICSMODE_DEFAULT);
+}
+
 /* Renderer loop on Pico's second core */
 void __scratch_x("render") render_core() {
     multicore_lockout_victim_init();
@@ -459,7 +611,7 @@ void __scratch_x("render") render_core() {
     graphics_set_bgcolor(0x000000);
     graphics_set_offset(32, 24);
 
-    graphics_set_flashmode(true, true);
+    graphics_set_flashmode(false, false);
     sem_acquire_blocking(&vga_start_semaphore);
 
     // 60 FPS loop
@@ -491,9 +643,6 @@ void __scratch_x("render") render_core() {
 
     __unreachable();
 }
-
-
-bool reboot = false;
 
 int main() {
     hw_set_bits(&vreg_and_chip_reset_hw->vreg, VREG_AND_CHIP_RESET_VREG_VSEL_BITS);
@@ -536,9 +685,15 @@ int main() {
         while (!reboot) {
             handle_input();
             SMS_run(&sms, SMS_CYCLES_PER_FRAME);
+
+            if ((gamepad1_bits.start && gamepad1_bits.select) || (keyboard_bits.start && keyboard_bits.select)) {
+                menu();
+            }
+
             tight_loop_contents();
         }
 
         reboot = false;
     }
+    __unreachable();
 }
