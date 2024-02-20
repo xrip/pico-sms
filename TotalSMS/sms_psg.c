@@ -282,7 +282,7 @@ void psg_sync(struct SMS_Core* sms)
     }
 }
 
-void psg_run(struct SMS_Core* sms, const uint8_t cycles)
+SMS_FORCE_INLINE void psg_run(struct SMS_Core* sms, const uint8_t cycles)
 {
     PSG.cycles += cycles; // PSG.cycles is an uint32_t, so it won't overflow
 }

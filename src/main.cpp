@@ -5,7 +5,7 @@
 #include <pico/multicore.h>
 #include <pico/stdlib.h>
 
-#include "TotalSMS/sms.h"
+#include "../TotalSMS/sms.h"
 
 #include <graphics.h>
 #include "audio.h"

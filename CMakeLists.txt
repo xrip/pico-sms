@@ -47,7 +47,7 @@ foreach (SRC_FILE IN LISTS SRC)
 endforeach ()
 message(STATUS "")
 
-add_executable(${PROJECT_NAME} ${SRC})
+add_executable(${PROJECT_NAME} ${SRC} TotalSMS/sms_single.c)
 
 pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
 target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
@@ -152,6 +152,8 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 		TFT_DC_PIN=10
 		TFT_DATA_PIN=12
 		TFT_CLK_PIN=13
+
+		SMS_SINGLE_FILE=1
 )
 
 target_link_options(${PROJECT_NAME} PRIVATE -Xlinker --print-memory-usage --data-sections)
