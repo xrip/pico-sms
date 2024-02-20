@@ -23,6 +23,7 @@ static size_t __uninitialized_ram(rom_size) = 0;
 static FATFS fs;
 bool reboot = false;
 bool frameskip = true;
+bool limit_fps = true;
 static SMS_Core sms = { };
 semaphore vga_start_semaphore;
 
@@ -462,7 +463,7 @@ const MenuItem menu_items[] = {
         {"Overclocking: %s",        OVERCLOCK, &overclock_v, 2, {"378 Mhz", "396 Mhz", "416 Mhz"}},
     //{"Player 2: %s",        ARRAY, &player_2_input, 2, {"Keyboard ", "Gamepad 1", "Gamepad 2"}},
         {""},
-        {"Frameskip: %s",     ARRAY, &frameskip,  1, {"NO ",       "YES"}},
+        {"Frameskip: %s",     ARRAY, &frameskip,  1, {"YES",       "NO "}},
         // {"Limit fps: %s",     ARRAY, &limit_fps,    1, {"NO ",       "YES"}},
         //{"Show fps: %s",     ARRAY, &show_fps,    1, {"NO ",       "YES"}},
         {""},
@@ -611,7 +612,7 @@ void __scratch_x("render") render_core() {
     graphics_set_bgcolor(0x000000);
     graphics_set_offset(32, 24);
 
-    graphics_set_flashmode(true, true);
+    graphics_set_flashmode(false, false);
     sem_acquire_blocking(&vga_start_semaphore);
 
     // 60 FPS loop
@@ -643,6 +644,9 @@ void __scratch_x("render") render_core() {
 
     __unreachable();
 }
+
+int frame, frame_cnt = 0;
+int frame_timer_start = 0;
 
 int main() {
     hw_set_bits(&vreg_and_chip_reset_hw->vreg, VREG_AND_CHIP_RESET_VREG_VSEL_BITS);
@@ -690,6 +694,17 @@ int main() {
                 menu();
             }
 
+
+            frame++;
+            if (limit_fps) {
+
+                frame_cnt++;
+                if (frame_cnt == 6) {
+                    while (time_us_64() - frame_timer_start < 16666 * 6);  // 60 Hz
+                    frame_timer_start = time_us_64();
+                    frame_cnt = 0;
+                }
+            }
             tight_loop_contents();
         }
 
