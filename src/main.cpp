@@ -93,7 +93,7 @@ static void handle_input() {
     SMS_set_port_a(&sms, JOY1_DOWN_BUTTON, keyboard_bits.down || gamepad1_bits.down);
     SMS_set_port_a(&sms, JOY1_UP_BUTTON, keyboard_bits.up || gamepad1_bits.up);
     SMS_set_port_a(&sms, JOY1_LEFT_BUTTON, keyboard_bits.left || gamepad1_bits.left);
-    SMS_set_port_a(&sms, JOY1_RIGHT_BUTTON, keyboard_bits.rigвфht || gamepad1_bits.right);
+    SMS_set_port_a(&sms, JOY1_RIGHT_BUTTON, keyboard_bits.right || gamepad1_bits.right);
     SMS_set_port_b(&sms, RESET_BUTTON, keyboard_bits.select || gamepad1_bits.select);
     SMS_set_port_a(&sms, JOY1_A_BUTTON, keyboard_bits.a || gamepad1_bits.a);
     SMS_set_port_a(&sms, JOY1_B_BUTTON, keyboard_bits.b || gamepad1_bits.b);

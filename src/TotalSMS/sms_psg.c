@@ -1,3 +1,4 @@
+#pragma GCC optimize("Ofast")
 // this code is all based on the fantastic docs linked below
 // SOURCE: https://www.smspower.org/uploads/Development/richard.txt
 // SOURCE: https://www.smspower.org/uploads/Development/psg-20030421.txt

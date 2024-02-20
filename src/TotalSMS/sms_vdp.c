@@ -1,3 +1,4 @@
+#pragma GCC optimize("Ofast")
 #include "pico.h"
 #include "sms.h"
 #include "sms_internal.h"
