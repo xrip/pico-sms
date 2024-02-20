@@ -90,24 +90,19 @@ Ps2Kbd_Mrmltr ps2kbd(
     process_kbd_report);
 
 static void handle_input() {
-    nespad_tick();
-    ps2kbd.tick();
-
     SMS_set_port_a(&sms, JOY1_DOWN_BUTTON, keyboard_bits.down || gamepad1_bits.down);
     SMS_set_port_a(&sms, JOY1_UP_BUTTON, keyboard_bits.up || gamepad1_bits.up);
     SMS_set_port_a(&sms, JOY1_LEFT_BUTTON, keyboard_bits.left || gamepad1_bits.left);
-    SMS_set_port_a(&sms, JOY1_RIGHT_BUTTON, keyboard_bits.right || gamepad1_bits.right);
+    SMS_set_port_a(&sms, JOY1_RIGHT_BUTTON, keyboard_bits.rigвфht || gamepad1_bits.right);
     SMS_set_port_b(&sms, RESET_BUTTON, keyboard_bits.select || gamepad1_bits.select);
     SMS_set_port_a(&sms, JOY1_A_BUTTON, keyboard_bits.a || gamepad1_bits.a);
     SMS_set_port_a(&sms, JOY1_B_BUTTON, keyboard_bits.b || gamepad1_bits.b);
+
     if (is_gg) {
         SMS_set_port_b(&sms, PAUSE_BUTTON, keyboard_bits.start || gamepad1_bits.start);
     }
 }
 
-
-// We get 6 bit RGB values, pack them into a byte swapped RGB565 value
-#define VGA_RGB_222(r, g, b) ((r << 4) | (g << 2) | b)
 
 __attribute__((always_inline)) inline uint32_t core_colour_callback(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
 
@@ -127,9 +122,9 @@ __attribute__((always_inline)) inline uint32_t core_colour_callback(uint8_t inde
 
 uint_fast32_t frames = 0;
 uint64_t start_time;
-#define FRAME_SKIP 0
+#define FRAME_SKIP 1
 
-static void core_vblank_callback(void* user) {
+static __always_inline void core_vblank_callback(void* user) {
     //(void) user;
     frames++;
     static int fps_skip_counter = FRAME_SKIP;
@@ -146,16 +141,14 @@ static void core_vblank_callback(void* user) {
 }
 
 i2s_config_t i2s_config;
-#define AUDIO_FREQ (44100)
+#define AUDIO_FREQ (22050)
 #define SAMPLES 4096
 static SMS_ApuSample sms_audio_samples[SAMPLES];
 
-__attribute__((always_inline)) inline void
-core_audio_callback(void* user, struct SMS_ApuSample* samples, uint32_t size) {
-    (void)user;
+static void core_audio_callback(void* user, SMS_ApuSample* samples, uint32_t size) {
     static int16_t audio_buffer[SAMPLES * 2];
-    SMS_apu_mixer_s16(samples, reinterpret_cast<int16_t *>(audio_buffer), size);
-    i2s_dma_write(&i2s_config, reinterpret_cast<const int16_t *>(audio_buffer));
+    SMS_apu_mixer_s16(samples, audio_buffer, size);
+    i2s_dma_write(&i2s_config, audio_buffer);
 }
 
 typedef struct __attribute__((__packed__)) {
@@ -201,7 +194,7 @@ bool filebrowser_loadfile(const char pathname[256]) {
     constexpr int window_y = (TEXTMODE_ROWS - 5) / 2;
     constexpr int window_x = (TEXTMODE_COLS - 43) / 2;
 
-    draw_window("Loading firmware", window_x, window_y, 43, 5);
+    draw_window("Loading ROM", window_x, window_y, 43, 5);
 
     FILINFO fileinfo;
     f_stat(pathname, &fileinfo);
@@ -447,6 +440,17 @@ void __scratch_x("render") render_core() {
     ps2kbd.init_gpio();
     nespad_begin(clock_get_hz(clk_sys) / 1000, NES_GPIO_CLK, NES_GPIO_DATA, NES_GPIO_LAT);
 
+
+    i2s_config = i2s_get_default_config();
+    i2s_config.sample_freq = AUDIO_FREQ;
+    i2s_config.dma_trans_count = sizeof(sms_audio_samples) / sizeof(sms_audio_samples[0]);
+    i2s_volume(&i2s_config, 0);
+    i2s_init(&i2s_config);
+    SMS_set_apu_callback(&sms, core_audio_callback, sms_audio_samples,
+                         sizeof(sms_audio_samples) / sizeof(sms_audio_samples[0]), AUDIO_FREQ);
+    SMS_set_colour_callback(&sms, core_colour_callback);
+    SMS_set_vblank_callback(&sms, core_vblank_callback);
+
     graphics_init();
 
     const auto buffer = (uint8_t *)SCREEN;
@@ -496,6 +500,8 @@ int main() {
     sleep_ms(10);
     set_sys_clock_khz(378 * KHZ, true);
 
+    SMS_init(&sms);
+
     sem_init(&vga_start_semaphore, 0, 1);
     multicore_launch_core1(render_core);
     sem_release(&vga_start_semaphore);
@@ -511,18 +517,6 @@ int main() {
         gpio_put(PICO_DEFAULT_LED_PIN, false);
     }
 
-    SMS_init(&sms);
-
-    SMS_set_colour_callback(&sms, core_colour_callback);
-    SMS_set_vblank_callback(&sms, core_vblank_callback);
-
-    i2s_config = i2s_get_default_config();
-    i2s_config.sample_freq = AUDIO_FREQ;
-    i2s_config.dma_trans_count = sizeof(sms_audio_samples) / sizeof(sms_audio_samples[0]);
-    i2s_volume(&i2s_config, 0);
-    i2s_init(&i2s_config);
-    SMS_set_apu_callback(&sms, core_audio_callback, sms_audio_samples,
-                         sizeof(sms_audio_samples) / sizeof(sms_audio_samples[0]), AUDIO_FREQ);
 
     SMS_set_pixels(&sms, &SCREEN, SMS_SCREEN_WIDTH, 8);
 
