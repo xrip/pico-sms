@@ -19,7 +19,9 @@
 const uint8_t* rom = (const uint8_t *)(XIP_BASE + FLASH_TARGET_OFFSET);
 
 bool __uninitialized_ram(is_gg) = false;
+char __uninitialized_ram(filename[256]);
 static size_t __uninitialized_ram(rom_size) = 0;
+
 static FATFS fs;
 bool reboot = false;
 bool frameskip = true;
@@ -173,7 +175,14 @@ int compareFileItems(const void* a, const void* b) {
 
 bool isExecutable(const char pathname[255],const char *extensions) {
     char *pathCopy = strdup(pathname);
-    const char* token = strtok(pathCopy, ".");
+    const char* token = strrchr(pathCopy, '.');
+
+    if (token == nullptr) {
+        return false;
+    }
+
+    token++;
+
     while (token != NULL) {
         if (strstr(extensions, token) != NULL) {
             free(pathCopy);
@@ -237,6 +246,8 @@ bool filebrowser_loadfile(const char pathname[256]) {
     f_close(&file);
     multicore_lockout_end_blocking();
     // restore_interrupts(ints);
+
+    strcpy(filename, fileinfo.fname);
 
     is_gg = strstr(pathname, ".gg") != nullptr;
     return true;
@@ -434,12 +445,10 @@ void filebrowser(const char pathname[256], const char executables[11]) {
 }
 
 enum menu_type_e {
-    EMPTY,
+    NONE,
     INT,
     TEXT,
     ARRAY,
-
-    OVERCLOCK,
 
     SAVE,
     LOAD,
@@ -447,30 +456,103 @@ enum menu_type_e {
     RETURN,
 };
 
+typedef bool (*menu_callback_t)();
+
 typedef struct __attribute__((__packed__)) {
-    const char *text;
+    const char* text;
     menu_type_e type;
-    const void *value;
+    const void* value;
+    menu_callback_t callback;
     uint8_t max_value;
-    char value_list[5][10];
+    char value_list[15][10];
 } MenuItem;
 
-uint16_t overclock[3] = { 378, 396, 416 };
-uint8_t overclock_v = 0;
+int save_slot = 0;
+uint16_t frequencies[] = { 378, 396, 404, 408, 412, 416, 420, 424, 432 };
+uint8_t frequency_index = 0;
+
+bool overclock() {
+    hw_set_bits(&vreg_and_chip_reset_hw->vreg, VREG_AND_CHIP_RESET_VREG_VSEL_BITS);
+    sleep_ms(10);
+    return set_sys_clock_khz(frequencies[frequency_index] * KHZ, true);
+}
+
+bool save() {
+    char pathname[255];
+
+    if (save_slot) {
+        sprintf(pathname, "SMS\\%s_%d.save", filename, save_slot);
+    }
+    else {
+        sprintf(pathname, "SMS\\%s.save", filename);
+    }
+
+    FRESULT fr = f_mount(&fs, "", 1);
+    FIL fd;
+    fr = f_open(&fd, pathname, FA_CREATE_ALWAYS | FA_WRITE);
+    UINT br;
+
+    f_write(&fd, &sms.cpu, sizeof(sms.cpu), &br);
+    f_write(&fd, &sms.vdp, sizeof(sms.vdp), &br);
+    f_write(&fd, &sms.psg, sizeof(sms.psg), &br);
+
+    f_write(&fd, &sms.cart, sizeof(sms.cart), &br);
+    f_write(&fd, &sms.memory_control, sizeof(sms.memory_control), &br);
+    f_write(&fd, &sms.system_ram, sizeof(sms.system_ram), &br);
+
+    f_close(&fd);
+
+    return true;
+}
+
+bool load() {
+    char pathname[255];
+
+    if (save_slot) {
+        sprintf(pathname, "SMS\\%s_%d.save", filename, save_slot);
+    }
+    else {
+        sprintf(pathname, "SMS\\%s.save", filename);
+    }
+
+    FRESULT fr = f_mount(&fs, "", 1);
+    FIL fd;
+    fr = f_open(&fd, pathname, FA_READ);
+    UINT br;
+
+    f_read(&fd, &sms.cpu, sizeof(sms.cpu), &br);
+    f_read(&fd, &sms.vdp, sizeof(sms.vdp), &br);
+    f_read(&fd, &sms.psg, sizeof(sms.psg), &br);
+
+    f_read(&fd, &sms.cart, sizeof(sms.cart), &br);
+    f_read(&fd, &sms.memory_control, sizeof(sms.memory_control), &br);
+    f_read(&fd, &sms.system_ram, sizeof(sms.system_ram), &br);
+
+    f_close(&fd);
+
+    // FIXME remove
+    SMS_loadstate(&sms, nullptr);
+
+    return true;
+}
+
 
 const MenuItem menu_items[] = {
-        // {"Player 1: %s",        ARRAY, &player_1_input, 2, {"Keyboard ", "Gamepad 1", "Gamepad 2"}},
-        {"Overclocking: %s",        OVERCLOCK, &overclock_v, 2, {"378 Mhz", "396 Mhz", "416 Mhz"}},
-    //{"Player 2: %s",        ARRAY, &player_2_input, 2, {"Keyboard ", "Gamepad 1", "Gamepad 2"}},
-        {""},
-        {"Frameskip: %s",     ARRAY, &frameskip,  1, {"YES",       "NO "}},
-        // {"Limit fps: %s",     ARRAY, &limit_fps,    1, {"NO ",       "YES"}},
-        //{"Show fps: %s",     ARRAY, &show_fps,    1, {"NO ",       "YES"}},
-        {""},
-        {"Reset to ROM select", ROM_SELECT},
-        {"Return to game",      RETURN}
+    {"Frameskip: %s",     ARRAY, &frameskip,  nullptr, 1, {"YES",       "NO "}},
+    //{ "Player 1: %s",        ARRAY, &player_1_input, 2, { "Keyboard ", "Gamepad 1", "Gamepad 2" }},
+    //{ "Player 2: %s",        ARRAY, &player_2_input, 2, { "Keyboard ", "Gamepad 1", "Gamepad 2" }},
+    {},
+    { "Save state: %i", INT, &save_slot, &save, 5 },
+    { "Load state: %i", INT, &save_slot, &load, 5 },
+{},
+{
+    "Overclocking: %s MHz", ARRAY, &frequency_index, &overclock, count_of(frequencies) - 1,
+    { "378", "396", "404", "408", "412", "416", "420", "424", "432" }
+},
+{ "Press START / Enter to apply", NONE },
+    { "Reset to ROM select", ROM_SELECT },
+    { "Return to game", RETURN }
 };
-
 #define MENU_ITEMS_NUMBER (sizeof(menu_items) / sizeof (MenuItem))
 
 void menu() {
@@ -485,17 +567,6 @@ void menu() {
     uint current_item = 0;
 
     while (!exit) {
-        sleep_ms(25);
-        if (gamepad1_bits.down || keyboard_bits.down) {
-            current_item = (current_item + 1) % MENU_ITEMS_NUMBER;
-            if (menu_items[current_item].type == EMPTY)
-                current_item++;
-        }
-        if (gamepad1_bits.up || keyboard_bits.up) {
-            current_item = (current_item - 1 + MENU_ITEMS_NUMBER) % MENU_ITEMS_NUMBER;
-            if (menu_items[current_item].type == EMPTY)
-                current_item--;
-        }
         for (int i = 0; i < MENU_ITEMS_NUMBER; i++) {
             uint8_t y = i + (TEXTMODE_ROWS - MENU_ITEMS_NUMBER >> 1);
             uint8_t x = TEXTMODE_COLS / 2 - 10;
@@ -520,36 +591,6 @@ void menu() {
                             }
                         }
                         break;
-                    case OVERCLOCK:
-                        if (item->max_value != 0) {
-                            auto* value = (uint8_t *)item->value;
-                            if ((gamepad1_bits.right || keyboard_bits.right) && *value < item->max_value) {
-                                (*value)++;
-                                hw_set_bits(&vreg_and_chip_reset_hw->vreg, VREG_AND_CHIP_RESET_VREG_VSEL_BITS);
-                                sleep_ms(10);
-                                set_sys_clock_khz(overclock[overclock_v] * KHZ, true);
-                            }
-                            if ((gamepad1_bits.left || keyboard_bits.left) && *value > 0) {
-                                (*value)--;
-                                hw_set_bits(&vreg_and_chip_reset_hw->vreg, VREG_AND_CHIP_RESET_VREG_VSEL_BITS);
-                                sleep_ms(10);
-                                set_sys_clock_khz(overclock[overclock_v] * KHZ, true);
-
-                            }
-                        }
-                        break;
-                    case SAVE:
-                        if (gamepad1_bits.start || keyboard_bits.start) {
-                            // save();
-                            exit = true;
-                        }
-                        break;
-                    case LOAD:
-                        if (gamepad1_bits.start || keyboard_bits.start) {
-                            // load();
-                            exit = true;
-                        }
-                        break;
                     case RETURN:
                         if (gamepad1_bits.start || keyboard_bits.start)
                             exit = true;
@@ -561,6 +602,12 @@ void menu() {
                             return;
                         }
                         break;
+                    default:
+                        break;
+                }
+
+                if (nullptr != item->callback && (gamepad1_bits.start || keyboard_bits.start)) {
+                    exit = item->callback();
                 }
             }
             static char result[TEXTMODE_COLS];
@@ -569,18 +616,33 @@ void menu() {
                     snprintf(result, TEXTMODE_COLS, item->text, *(uint8_t *)item->value);
                     break;
                 case ARRAY:
-                case OVERCLOCK:
                     snprintf(result, TEXTMODE_COLS, item->text, item->value_list[*(uint8_t *)item->value]);
                     break;
                 case TEXT:
                     snprintf(result, TEXTMODE_COLS, item->text, item->value);
                     break;
+                case NONE:
+                    color = 6;
                 default:
                     snprintf(result, TEXTMODE_COLS, "%s", item->text);
             }
             draw_text(result, x, y, color, bg_color);
         }
-        sleep_ms(100);
+
+        if (gamepad1_bits.down || keyboard_bits.down) {
+            current_item = (current_item + 1) % MENU_ITEMS_NUMBER;
+
+            if (menu_items[current_item].type == NONE)
+                current_item++;
+        }
+        if (gamepad1_bits.up || keyboard_bits.up) {
+            current_item = (current_item - 1 + MENU_ITEMS_NUMBER) % MENU_ITEMS_NUMBER;
+
+            if (menu_items[current_item].type == NONE)
+                current_item--;
+        }
+
+        sleep_ms(125);
     }
 
     graphics_set_mode(GRAPHICSMODE_DEFAULT);
@@ -592,7 +654,6 @@ void __scratch_x("render") render_core() {
 
     ps2kbd.init_gpio();
     nespad_begin(clock_get_hz(clk_sys) / 1000, NES_GPIO_CLK, NES_GPIO_DATA, NES_GPIO_LAT);
-
 
     i2s_config = i2s_get_default_config();
     i2s_config.sample_freq = AUDIO_FREQ;
@@ -616,29 +677,26 @@ void __scratch_x("render") render_core() {
     sem_acquire_blocking(&vga_start_semaphore);
 
     // 60 FPS loop
-#define frame_tick (16666)
+    #define frame_tick (16666)
     uint64_t tick = time_us_64();
-#ifdef TFT
-    uint64_t last_renderer_tick = tick;
-#endif
-    uint64_t last_input_tick = tick;
+    uint64_t last_frame_tick = tick;
+
     while (true) {
+
+        if (tick >= last_frame_tick + frame_tick) {
 #ifdef TFT
-        if (tick >= last_renderer_tick + frame_tick) {
             refresh_lcd();
-            last_renderer_tick = tick;
-        }
 #endif
-        if (tick >= last_input_tick + frame_tick * 1) {
             ps2kbd.tick();
             nespad_tick();
-            last_input_tick = tick;
+
+            last_frame_tick = tick;
         }
+
         tick = time_us_64();
 
-
         // tuh_task();
-        //hid_app_task();
+        // hid_app_task();
         tight_loop_contents();
     }
 
@@ -649,9 +707,7 @@ int frame, frame_cnt = 0;
 int frame_timer_start = 0;
 
 int main() {
-    hw_set_bits(&vreg_and_chip_reset_hw->vreg, VREG_AND_CHIP_RESET_VREG_VSEL_BITS);
-    sleep_ms(10);
-    set_sys_clock_khz(378 * KHZ, true);
+    overclock();
 
     SMS_init(&sms);
 

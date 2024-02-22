@@ -450,7 +450,7 @@ bool SMS_savestate(const struct SMS_Core* sms, struct SMS_State* state)
 
 bool SMS_loadstate(struct SMS_Core* sms, const struct SMS_State* state)
 {
-    if (state->header.magic != STATE_MAGIC)
+    /*if (state->header.magic != STATE_MAGIC)
     {
         SMS_log("bad savestate, invalid magic. got: 0x%04X wanted: 0x%04X\n", state->header.magic, STATE_MAGIC);
         return false;
@@ -473,7 +473,7 @@ bool SMS_loadstate(struct SMS_Core* sms, const struct SMS_State* state)
     memcpy(&sms->psg, &state->psg, sizeof(sms->psg));
     memcpy(&sms->cart, &state->cart, sizeof(sms->cart));
     memcpy(&sms->memory_control, &state->memory_control, sizeof(sms->memory_control));
-    memcpy(sms->system_ram, state->system_ram, sizeof(sms->system_ram));
+    memcpy(sms->system_ram, state->system_ram, sizeof(sms->system_ram));*/
 
     // we need to reload the mapper pointers!
     mapper_update(sms);
