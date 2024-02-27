@@ -1,3 +1,10 @@
+# v2.0.0
+- VGA / HDMI / TFT / TV Out composite outputs added
+- Filebrowser reworked
+- Ability to overclock from ingame menu
+- Swap AB keys in menu
+- Huge speedup
+
 # v1.1.0
 
 PS2 keyboard support
