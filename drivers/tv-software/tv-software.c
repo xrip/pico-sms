@@ -1014,7 +1014,7 @@ static bool __time_critical_func(video_timer_callbackTV)(repeating_timer_t* rt) 
                         }
                         break;
                         case GRAPHICSMODE_DEFAULT: {
-                            if (y < graphics_buffer.shift_y || y > graphics_buffer.height+graphics_buffer.shift_y) {
+                            if (y < graphics_buffer.shift_y || y >= graphics_buffer.height+graphics_buffer.shift_y) {
                                 for (int i = 0; i < video_mode.img_W - d_end; i++) {
                                     uint32_t cout32 = conv_color[li][200];
                                     uint8_t* c_4 = &cout32;

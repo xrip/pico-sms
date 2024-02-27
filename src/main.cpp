@@ -46,11 +46,18 @@ static input_bits_t keyboard_bits = { false, false, false, false, false, false, 
 static input_bits_t gamepad1_bits = { false, false, false, false, false, false, false, false };
 static input_bits_t gamepad2_bits = { false, false, false, false, false, false, false, false };
 
+bool swap_ab = false;
+
 void nespad_tick() {
     nespad_read();
 
-    gamepad1_bits.a = (nespad_state & DPAD_A) != 0;
-    gamepad1_bits.b = (nespad_state & DPAD_B) != 0;
+    if (swap_ab) {
+        gamepad1_bits.a = (nespad_state & DPAD_A) != 0;
+        gamepad1_bits.b = (nespad_state & DPAD_B) != 0;
+    } else {
+        gamepad1_bits.b = (nespad_state & DPAD_A) != 0;
+        gamepad1_bits.a = (nespad_state & DPAD_B) != 0;
+    }
     gamepad1_bits.select = (nespad_state & DPAD_SELECT) != 0;
     gamepad1_bits.start = (nespad_state & DPAD_START) != 0;
     gamepad1_bits.up = (nespad_state & DPAD_UP) != 0;
@@ -538,6 +545,7 @@ bool load() {
 
 
 const MenuItem menu_items[] = {
+    {"Swap AB <> BA: %s",     ARRAY, &swap_ab,  nullptr, 1, {"NO ",       "YES"}},
     {"Frameskip: %s",     ARRAY, &frameskip,  nullptr, 1, {"YES",       "NO "}},
     //{ "Player 1: %s",        ARRAY, &player_1_input, 2, { "Keyboard ", "Gamepad 1", "Gamepad 2" }},
     //{ "Player 2: %s",        ARRAY, &player_2_input, 2, { "Keyboard ", "Gamepad 1", "Gamepad 2" }},
