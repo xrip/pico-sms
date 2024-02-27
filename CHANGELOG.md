@@ -4,6 +4,7 @@
 - Ability to overclock from ingame menu
 - Swap AB keys in menu
 - Huge speedup
+- I2S sound available
 
 # v1.1.0
 
@@ -11,7 +12,7 @@ PS2 keyboard support
 
 # v1.0.1
 
-Sound enabled. Realy usable only near to maximum overclock.
+Sound enabled. Really usable only near to maximum overclock.
 Release with different overclocking profiles. 
 
 # v1.0.0
