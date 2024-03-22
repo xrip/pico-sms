@@ -5,7 +5,9 @@
 #include <pico/multicore.h>
 #include <pico/stdlib.h>
 
-#include "../TotalSMS/sms.h"
+extern "C" {
+#include "smsplus/shared.h"
+}
 
 #include <graphics.h>
 #include "audio.h"
@@ -25,11 +27,10 @@ static size_t __uninitialized_ram(rom_size) = 0;
 static FATFS fs;
 bool reboot = false;
 bool frameskip = true;
-bool limit_fps = true;
-static SMS_Core sms = { };
+bool limit_fps = false;
 semaphore vga_start_semaphore;
 
-uint8_t SCREEN[SMS_SCREEN_HEIGHT][SMS_SCREEN_WIDTH];
+uint8_t SCREEN[192][256];
 
 struct input_bits_t {
     bool a: true;
@@ -64,6 +65,21 @@ void nespad_tick() {
     gamepad1_bits.down = (nespad_state & DPAD_DOWN) != 0;
     gamepad1_bits.left = (nespad_state & DPAD_LEFT) != 0;
     gamepad1_bits.right = (nespad_state & DPAD_RIGHT) != 0;
+
+    int smsButtons = 0;
+    int smsSystem = 0 ;
+    if (gamepad1_bits.up) smsButtons|=INPUT_UP;
+    if (gamepad1_bits.down) smsButtons|=INPUT_DOWN;
+    if (gamepad1_bits.left) smsButtons|=INPUT_LEFT;
+    if (gamepad1_bits.right) smsButtons|=INPUT_RIGHT;
+    if (gamepad1_bits.a) smsButtons|=INPUT_BUTTON1;
+    if (gamepad1_bits.b) smsButtons|=INPUT_BUTTON2;
+    if (gamepad1_bits.start) smsSystem|=INPUT_START;
+    if (gamepad1_bits.select) smsSystem|=INPUT_PAUSE;
+    // if (gamepad1_bits.down) smsSystem|=INPUT_SOFT_RESET;
+    // if (gamepad1_bits.down) smsSystem|=INPUT_HARD_RESET;
+    input.pad[0]=smsButtons;
+    input.system=smsSystem;
 }
 
 static bool isInReport(hid_keyboard_report_t const* report, const unsigned char keycode) {
@@ -98,65 +114,16 @@ Ps2Kbd_Mrmltr ps2kbd(
     0,
     process_kbd_report);
 
-static void handle_input() {
-
-    SMS_set_port_a(&sms, JOY1_DOWN_BUTTON, keyboard_bits.down || gamepad1_bits.down);
-    SMS_set_port_a(&sms, JOY1_UP_BUTTON, keyboard_bits.up || gamepad1_bits.up);
-    SMS_set_port_a(&sms, JOY1_LEFT_BUTTON, keyboard_bits.left || gamepad1_bits.left);
-    SMS_set_port_a(&sms, JOY1_RIGHT_BUTTON, keyboard_bits.right || gamepad1_bits.right);
-    // SMS_set_port_b(&sms, RESET_BUTTON, keyboard_bits.select || gamepad1_bits.select);
-    SMS_set_port_a(&sms, JOY1_A_BUTTON, keyboard_bits.a || gamepad1_bits.a);
-    SMS_set_port_a(&sms, JOY1_B_BUTTON, keyboard_bits.b || gamepad1_bits.b);
-
-    if (is_gg) {
-        SMS_set_port_b(&sms, PAUSE_BUTTON, keyboard_bits.start || gamepad1_bits.start);
-    }
-}
 
 
-__attribute__((always_inline)) inline uint32_t core_colour_callback(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
-
-    if (SMS_get_system_type(&sms) == SMS_System_GG) {
-        r <<= 4;
-        g <<= 4;
-        b <<= 4;
-    }
-    else {
-        r <<= 6;
-        g <<= 6;
-        b <<= 6;
-    }
-    graphics_set_palette(index, RGB888(r,g,b));
-    return index;
-}
 
 uint_fast32_t frames = 0;
 uint64_t start_time;
 
-static __always_inline void core_vblank_callback(void* user) {
-    //(void) user;
-    frames++;
-    static int fps_skip_counter = frameskip ? 0 : 1;
-
-    if (fps_skip_counter > 0) {
-        fps_skip_counter--;
-        SMS_skip_frame(&sms, true);
-    } else {
-        fps_skip_counter = frameskip ? 0 : 1;
-        SMS_skip_frame(&sms, false);
-    }
-}
 
 i2s_config_t i2s_config;
 #define AUDIO_FREQ (22050)
-#define SAMPLES 4096
-static SMS_ApuSample sms_audio_samples[SAMPLES];
 
-static void core_audio_callback(void* user, SMS_ApuSample* samples, uint32_t size) {
-    static int16_t audio_buffer[SAMPLES * 2];
-    SMS_apu_mixer_s16(samples, audio_buffer, size);
-    i2s_dma_write(&i2s_config, audio_buffer);
-}
 
 typedef struct __attribute__((__packed__)) {
     bool is_directory;
@@ -499,13 +466,7 @@ bool save() {
     fr = f_open(&fd, pathname, FA_CREATE_ALWAYS | FA_WRITE);
     UINT br;
 
-    f_write(&fd, &sms.cpu, sizeof(sms.cpu), &br);
-    f_write(&fd, &sms.vdp, sizeof(sms.vdp), &br);
-    f_write(&fd, &sms.psg, sizeof(sms.psg), &br);
 
-    f_write(&fd, &sms.cart, sizeof(sms.cart), &br);
-    f_write(&fd, &sms.memory_control, sizeof(sms.memory_control), &br);
-    f_write(&fd, &sms.system_ram, sizeof(sms.system_ram), &br);
 
     f_close(&fd);
 
@@ -527,18 +488,9 @@ bool load() {
     fr = f_open(&fd, pathname, FA_READ);
     UINT br;
 
-    f_read(&fd, &sms.cpu, sizeof(sms.cpu), &br);
-    f_read(&fd, &sms.vdp, sizeof(sms.vdp), &br);
-    f_read(&fd, &sms.psg, sizeof(sms.psg), &br);
 
-    f_read(&fd, &sms.cart, sizeof(sms.cart), &br);
-    f_read(&fd, &sms.memory_control, sizeof(sms.memory_control), &br);
-    f_read(&fd, &sms.system_ram, sizeof(sms.system_ram), &br);
 
     f_close(&fd);
-
-    // FIXME remove
-    SMS_loadstate(&sms, nullptr);
 
     return true;
 }
@@ -665,18 +617,15 @@ void __scratch_x("render") render_core() {
 
     i2s_config = i2s_get_default_config();
     i2s_config.sample_freq = AUDIO_FREQ;
-    i2s_config.dma_trans_count = sizeof(sms_audio_samples) / sizeof(sms_audio_samples[0]);
+    i2s_config.dma_trans_count = AUDIO_FREQ / 60;
     i2s_volume(&i2s_config, 0);
     i2s_init(&i2s_config);
-    SMS_set_apu_callback(&sms, core_audio_callback, sms_audio_samples,
-                         sizeof(sms_audio_samples) / sizeof(sms_audio_samples[0]), AUDIO_FREQ);
-    SMS_set_colour_callback(&sms, core_colour_callback);
-    SMS_set_vblank_callback(&sms, core_vblank_callback);
+
 
     graphics_init();
 
     const auto buffer = (uint8_t *)SCREEN;
-    graphics_set_buffer(buffer, SMS_SCREEN_WIDTH, SMS_SCREEN_HEIGHT);
+    graphics_set_buffer(buffer, BMP_WIDTH, BMP_HEIGHT);
     graphics_set_textbuffer(buffer);
     graphics_set_bgcolor(0x000000);
     graphics_set_offset(32, 24);
@@ -714,10 +663,12 @@ void __scratch_x("render") render_core() {
 int frame, frame_cnt = 0;
 int frame_timer_start = 0;
 
+void system_load_sram(void) {
+}
+
+
 int main() {
     overclock();
-
-    SMS_init(&sms);
 
     sem_init(&vga_start_semaphore, 0, 1);
     multicore_launch_core1(render_core);
@@ -735,24 +686,35 @@ int main() {
     }
 
 
-    SMS_set_pixels(&sms, &SCREEN, SMS_SCREEN_WIDTH, 8);
+    sms.use_fm = false;
+    sms.country = TYPE_OVERSEAS;
+    sms.dummy = (uint8_t *) SCREEN;
+    //sms.sram = (uint8_t *) SRAM;
+
+    bitmap.data = (uint8_t *) SCREEN;
+    bitmap.pitch = bitmap.width = 256;
+    bitmap.height = 192;
+    bitmap.depth = 8;
+
+    cart.pages=((512*1024)/0x4000);
+    cart.rom = (uint8_t*)rom;
+    cart.type=TYPE_SMS;
+    emu_system_init(44100);
+    system_reset();
+
 
     while (true) {
         graphics_set_mode(TEXTMODE_DEFAULT);
         filebrowser(HOME_DIR, "sms,gg");
-
-        if (!SMS_loadrom(&sms, rom, rom_size, is_gg ? SMS_System_GG : SMS_System_SMS)) {
-            while (1) draw_text("Failed running rom!", 0, 0, 4, 0);
-        }
-
         graphics_set_mode(GRAPHICSMODE_DEFAULT);
 
 
         start_time = time_us_64();
 
         while (!reboot) {
-            handle_input();
-            SMS_run(&sms, SMS_CYCLES_PER_FRAME);
+            sms_frame(0);
+            // for(int x = 0; x <64; x++) graphics_set_palette(x, RGB888(bitmap.pal.color[x][0], bitmap.pal.color[x][1], bitmap.pal.color[x][2]));
+
 
             if ((gamepad1_bits.start && gamepad1_bits.select) || (keyboard_bits.start && keyboard_bits.select)) {
                 menu();
