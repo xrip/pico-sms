@@ -696,18 +696,19 @@ int main() {
     bitmap.height = 192;
     bitmap.depth = 8;
 
-    cart.pages=((512*1024)/0x4000);
     cart.rom = (uint8_t*)rom;
     cart.type=TYPE_SMS;
     emu_system_init(44100);
-    system_reset();
 
 
     while (true) {
+
         graphics_set_mode(TEXTMODE_DEFAULT);
         filebrowser(HOME_DIR, "sms,gg");
         graphics_set_mode(GRAPHICSMODE_DEFAULT);
-
+        cart.type = is_gg ? TYPE_GG : TYPE_SMS;
+        cart.pages= rom_size/0x4000;
+        system_reset();
 
         start_time = time_us_64();
 
