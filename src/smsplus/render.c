@@ -1,4 +1,3 @@
-
 #include <graphics.h>
 
 #include "shared.h"
@@ -10,11 +9,11 @@ void (*render_bg)(int line);
 uint8 *linebuf;
 
 /* Precalculated pixel table */
-uint16 pixel[PALETTE_SIZE];
+//uint16 pixel[PALETTE_SIZE];
 
 //Each tile takes up 8*8=64 bytes. We have 512 tiles * 4 attribs, so 2K tiles max.
 #define CACHEDTILES 512
-#define ALIGN_DWORD 1 //esp doesn't support unaligned word writes
+#define ALIGN_DWORD 0 //esp doesn't support unaligned word writes
 
 int16 cachePtr[512*4];				//(tile+attr<<9) -> cache tile store index (i<<6); -1 if not cached
 uint8 cacheStore[CACHEDTILES*64];	//Tile store
@@ -590,14 +589,14 @@ void palette_sync(int index)
         b = ((vdp.cram[index] >> 4) & 3) << 6;
     }
 
-    bitmap.pal.color[index][0] = r;
-    bitmap.pal.color[index][1] = g;
-    bitmap.pal.color[index][2] = b;
+    // bitmap.pal.color[index][0] = r;
+    // bitmap.pal.color[index][1] = g;
+    // bitmap.pal.color[index][2] = b;
 
-    pixel[index] = MAKE_PIXEL(r, g, b);
+    // pixel[index] = MAKE_PIXEL(r, g, b);
     graphics_set_palette(index, RGB888(r,g,b));
 
-    bitmap.pal.dirty[index] = bitmap.pal.update = 1;
+    // bitmap.pal.dirty[index] = bitmap.pal.update = 1;
 }
 
 
