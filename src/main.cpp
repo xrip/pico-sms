@@ -17,8 +17,9 @@ extern "C" {
 #include "ps2kbd_mrmltr.h"
 
 #define HOME_DIR "\\SMS"
-#define FLASH_TARGET_OFFSET (1024 * 1024)
-const uint8_t* rom = (const uint8_t *)(XIP_BASE + FLASH_TARGET_OFFSET);
+extern char __flash_binary_end;
+#define FLASH_TARGET_OFFSET (((((uintptr_t)&__flash_binary_end - XIP_BASE) / FLASH_SECTOR_SIZE) + 4) * FLASH_SECTOR_SIZE)
+static const uintptr_t rom = XIP_BASE + FLASH_TARGET_OFFSET;
 
 bool __uninitialized_ram(is_gg) = false;
 char __uninitialized_ram(filename[256]);
@@ -122,7 +123,7 @@ uint64_t start_time;
 
 
 i2s_config_t i2s_config;
-#define AUDIO_FREQ (22050)
+#define AUDIO_FREQ (48000)
 
 
 typedef struct __attribute__((__packed__)) {
@@ -666,7 +667,7 @@ int frame_timer_start = 0;
 void system_load_sram(void) {
 }
 
-
+static int audio_buffer[AUDIO_FREQ / 60];
 int main() {
     overclock();
 
@@ -698,7 +699,7 @@ int main() {
 
     cart.rom = (uint8_t*)rom;
     cart.type=TYPE_SMS;
-    emu_system_init(44100);
+
 
 
     while (true) {
@@ -706,6 +707,7 @@ int main() {
         graphics_set_mode(TEXTMODE_DEFAULT);
         filebrowser(HOME_DIR, "sms,gg");
         graphics_set_mode(GRAPHICSMODE_DEFAULT);
+        emu_system_init(AUDIO_FREQ);
         cart.type = is_gg ? TYPE_GG : TYPE_SMS;
         cart.pages= rom_size/0x4000;
         system_reset();
@@ -733,6 +735,14 @@ int main() {
                 }
             }
             tight_loop_contents();
+
+            // process audio
+            for (int x = 0; x < snd.bufsize; x++) {
+                audio_buffer[x] = (snd.buffer[0][x] << 16) + snd.buffer[1][x];
+            }
+
+            i2s_dma_write(&i2s_config, (const int16_t *) audio_buffer);
+
         }
 
         reboot = false;
