@@ -16,7 +16,8 @@ option(SOFTTV "Enable TV soft composite output" OFF)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -funroll-loops   -ffast-math -feliminate-unused-debug-types -ffunction-sections -fdata-sections -O2")
+#add_compile_options(-flto)
+set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -funroll-loops  -ffast-math -feliminate-unused-debug-types -ffunction-sections -fdata-sections -O2")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -funroll-loops  -ffast-math -feliminate-unused-debug-types -ffunction-sections -fdata-sections -O2")
 
 set(OUTPUT_DIR "${CMAKE_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}")
@@ -164,7 +165,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 		SMS_SINGLE_FILE=1
 )
 
-target_link_options(${PROJECT_NAME} PRIVATE -Xlinker --print-memory-usage --data-sections)
+target_link_options(${PROJECT_NAME} PRIVATE -Xlinker --print-memory-usage --data-sections --function-sections)
 pico_add_extra_outputs(${PROJECT_NAME})
 
 

@@ -133,7 +133,7 @@ typedef struct __attribute__((__packed__)) {
     char filename[79];
 } file_item_t;
 
-constexpr int max_files = 600;
+constexpr int max_files = 500;
 file_item_t * fileItems = (file_item_t *)(&SCREEN[0][0] + TEXTMODE_COLS*TEXTMODE_ROWS*2);
 
 int compareFileItems(const void* a, const void* b) {
@@ -610,18 +610,11 @@ void menu() {
 }
 
 /* Renderer loop on Pico's second core */
-void __scratch_x("render") render_core() {
+void __time_critical_func(render_core)() {
     multicore_lockout_victim_init();
 
     ps2kbd.init_gpio();
     nespad_begin(clock_get_hz(clk_sys) / 1000, NES_GPIO_CLK, NES_GPIO_DATA, NES_GPIO_LAT);
-
-    i2s_config = i2s_get_default_config();
-    i2s_config.sample_freq = AUDIO_FREQ;
-    i2s_config.dma_trans_count = AUDIO_FREQ / 60;
-    i2s_volume(&i2s_config, 0);
-    i2s_init(&i2s_config);
-
 
     graphics_init();
 
@@ -685,6 +678,14 @@ int main() {
         sleep_ms(33);
         gpio_put(PICO_DEFAULT_LED_PIN, false);
     }
+
+
+
+    i2s_config = i2s_get_default_config();
+    i2s_config.sample_freq = AUDIO_FREQ;
+    i2s_config.dma_trans_count = AUDIO_FREQ / 60;
+    i2s_volume(&i2s_config, 0);
+    i2s_init(&i2s_config);
 
 
     sms.use_fm = false;
