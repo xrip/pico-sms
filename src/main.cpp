@@ -707,7 +707,8 @@ int main() {
 
         graphics_set_mode(TEXTMODE_DEFAULT);
         filebrowser(HOME_DIR, "sms,gg");
-        graphics_set_mode(GRAPHICSMODE_DEFAULT);
+        graphics_set_mode(is_gg ? GG_160x144 : GRAPHICSMODE_DEFAULT);
+        graphics_set_offset(is_gg ? 40 : 16, 24);
         emu_system_init(AUDIO_FREQ);
         cart.type = is_gg ? TYPE_GG : TYPE_SMS;
         cart.pages= rom_size/0x4000;
