@@ -21,9 +21,11 @@ extern char __flash_binary_end;
 #define FLASH_TARGET_OFFSET (((((uintptr_t)&__flash_binary_end - XIP_BASE) / FLASH_SECTOR_SIZE) + 4) * FLASH_SECTOR_SIZE)
 static const uintptr_t rom = XIP_BASE + FLASH_TARGET_OFFSET;
 
-bool __uninitialized_ram(is_gg) = false;
+bool __uninitialized_ram(is_gg)
+= false;
 char __uninitialized_ram(filename[256]);
-static size_t __uninitialized_ram(rom_size) = 0;
+static size_t __uninitialized_ram(rom_size)
+= 0;
 
 static FATFS fs;
 bool reboot = false;
@@ -68,22 +70,22 @@ void nespad_tick() {
     gamepad1_bits.right = (nespad_state & DPAD_RIGHT) != 0;
 
     int smsButtons = 0;
-    int smsSystem = 0 ;
-    if (gamepad1_bits.up) smsButtons|=INPUT_UP;
-    if (gamepad1_bits.down) smsButtons|=INPUT_DOWN;
-    if (gamepad1_bits.left) smsButtons|=INPUT_LEFT;
-    if (gamepad1_bits.right) smsButtons|=INPUT_RIGHT;
-    if (gamepad1_bits.a) smsButtons|=INPUT_BUTTON1;
-    if (gamepad1_bits.b) smsButtons|=INPUT_BUTTON2;
-    if (gamepad1_bits.start) smsSystem|=INPUT_START;
-    if (gamepad1_bits.select) smsSystem|=INPUT_PAUSE;
+    int smsSystem = 0;
+    if (gamepad1_bits.up) smsButtons |= INPUT_UP;
+    if (gamepad1_bits.down) smsButtons |= INPUT_DOWN;
+    if (gamepad1_bits.left) smsButtons |= INPUT_LEFT;
+    if (gamepad1_bits.right) smsButtons |= INPUT_RIGHT;
+    if (gamepad1_bits.a) smsButtons |= INPUT_BUTTON1;
+    if (gamepad1_bits.b) smsButtons |= INPUT_BUTTON2;
+    if (gamepad1_bits.start) smsSystem |= INPUT_START;
+    if (gamepad1_bits.select) smsSystem |= INPUT_PAUSE;
     // if (gamepad1_bits.down) smsSystem|=INPUT_SOFT_RESET;
     // if (gamepad1_bits.down) smsSystem|=INPUT_HARD_RESET;
-    input.pad[0]=smsButtons;
-    input.system=smsSystem;
+    input.pad[0] = smsButtons;
+    input.system = smsSystem;
 }
 
-static bool isInReport(hid_keyboard_report_t const* report, const unsigned char keycode) {
+static bool isInReport(hid_keyboard_report_t const *report, const unsigned char keycode) {
     for (unsigned char i: report->keycode) {
         if (i == keycode) {
             return true;
@@ -93,7 +95,7 @@ static bool isInReport(hid_keyboard_report_t const* report, const unsigned char 
 }
 
 void
-__not_in_flash_func(process_kbd_report)(hid_keyboard_report_t const* report, hid_keyboard_report_t const* prev_report) {
+__not_in_flash_func(process_kbd_report)(hid_keyboard_report_t const *report, hid_keyboard_report_t const *prev_report) {
     /* printf("HID key report modifiers %2.2X report ", report->modifier);
     for (unsigned char i: report->keycode)
         printf("%2.2X", i);
@@ -111,11 +113,9 @@ __not_in_flash_func(process_kbd_report)(hid_keyboard_report_t const* report, hid
 }
 
 Ps2Kbd_Mrmltr ps2kbd(
-    pio1,
-    0,
-    process_kbd_report);
-
-
+        pio1,
+        0,
+        process_kbd_report);
 
 
 uint_fast32_t frames = 0;
@@ -134,11 +134,11 @@ typedef struct __attribute__((__packed__)) {
 } file_item_t;
 
 constexpr int max_files = 500;
-file_item_t * fileItems = (file_item_t *)(&SCREEN[0][0] + TEXTMODE_COLS*TEXTMODE_ROWS*2);
+file_item_t *fileItems = (file_item_t *) (&SCREEN[0][0] + TEXTMODE_COLS * TEXTMODE_ROWS * 2);
 
-int compareFileItems(const void* a, const void* b) {
-    const auto* itemA = (file_item_t *)a;
-    const auto* itemB = (file_item_t *)b;
+int compareFileItems(const void *a, const void *b) {
+    const auto *itemA = (file_item_t *) a;
+    const auto *itemB = (file_item_t *) b;
     // Directories come first
     if (itemA->is_directory && !itemB->is_directory)
         return -1;
@@ -148,9 +148,9 @@ int compareFileItems(const void* a, const void* b) {
     return strcmp(itemA->filename, itemB->filename);
 }
 
-bool isExecutable(const char pathname[255],const char *extensions) {
+bool isExecutable(const char pathname[255], const char *extensions) {
     char *pathCopy = strdup(pathname);
-    const char* token = strrchr(pathCopy, '.');
+    const char *token = strrchr(pathCopy, '.');
 
     if (token == nullptr) {
         return false;
@@ -213,8 +213,7 @@ bool filebrowser_loadfile(const char pathname[256]) {
 
                 flash_target_offset += FLASH_PAGE_SIZE;
             }
-        }
-        while (bytes_read != 0);
+        } while (bytes_read != 0);
 
         gpio_put(PICO_DEFAULT_LED_PIN, true);
     }
@@ -287,7 +286,7 @@ void filebrowser(const char pathname[256], const char executables[11]) {
         while (f_readdir(&dir, &fileInfo) == FR_OK &&
                fileInfo.fname[0] != '\0' &&
                total_files < max_files
-        ) {
+                ) {
             // Set the file item properties
             fileItems[total_files].is_directory = fileInfo.fattrib & AM_DIR;
             fileItems[total_files].size = fileInfo.fsize;
@@ -322,8 +321,7 @@ void filebrowser(const char pathname[256], const char executables[11]) {
                 if (offset + (current_item + 1) < total_files) {
                     if (current_item + 1 < per_page) {
                         current_item++;
-                    }
-                    else {
+                    } else {
                         offset++;
                     }
                 }
@@ -332,8 +330,7 @@ void filebrowser(const char pathname[256], const char executables[11]) {
             if (nespad_state & DPAD_UP || keyboard_bits.up) {
                 if (current_item > 0) {
                     current_item--;
-                }
-                else if (offset > 0) {
+                } else if (offset > 0) {
                     offset--;
                 }
             }
@@ -348,8 +345,7 @@ void filebrowser(const char pathname[256], const char executables[11]) {
             if (nespad_state & DPAD_LEFT || keyboard_bits.left) {
                 if (offset > per_page) {
                     offset -= per_page;
-                }
-                else {
+                } else {
                     offset = 0;
                     current_item = 0;
                 }
@@ -360,13 +356,12 @@ void filebrowser(const char pathname[256], const char executables[11]) {
 
                 if (file_at_cursor.is_directory) {
                     if (strcmp(file_at_cursor.filename, "..") == 0) {
-                        const char* lastBackslash = strrchr(basepath, '\\');
+                        const char *lastBackslash = strrchr(basepath, '\\');
                         if (lastBackslash != nullptr) {
                             const size_t length = lastBackslash - basepath;
                             basepath[length] = '\0';
                         }
-                    }
-                    else {
+                    } else {
                         sprintf(basepath, "%s\\%s", basepath, file_at_cursor.filename);
                     }
                     debounce = false;
@@ -409,8 +404,7 @@ void filebrowser(const char pathname[256], const char executables[11]) {
                     memset(tmp, ' ', TEXTMODE_COLS - 2);
                     tmp[TEXTMODE_COLS - 2] = '\0';
                     memcpy(&tmp, item.filename, len < TEXTMODE_COLS - 2 ? len : TEXTMODE_COLS - 2);
-                }
-                else {
+                } else {
                     memset(tmp, ' ', TEXTMODE_COLS - 2);
                 }
                 draw_text(tmp, 1, i + 1, color, bg_color);
@@ -434,9 +428,9 @@ enum menu_type_e {
 typedef bool (*menu_callback_t)();
 
 typedef struct __attribute__((__packed__)) {
-    const char* text;
+    const char *text;
     menu_type_e type;
-    const void* value;
+    const void *value;
     menu_callback_t callback;
     uint8_t max_value;
     char value_list[15][10];
@@ -457,8 +451,7 @@ bool save() {
 
     if (save_slot) {
         sprintf(pathname, "SMS\\%s_%d.save", filename, save_slot);
-    }
-    else {
+    } else {
         sprintf(pathname, "SMS\\%s.save", filename);
     }
 
@@ -466,7 +459,6 @@ bool save() {
     FIL fd;
     fr = f_open(&fd, pathname, FA_CREATE_ALWAYS | FA_WRITE);
     UINT br;
-
 
 
     f_close(&fd);
@@ -479,8 +471,7 @@ bool load() {
 
     if (save_slot) {
         sprintf(pathname, "SMS\\%s_%d.save", filename, save_slot);
-    }
-    else {
+    } else {
         sprintf(pathname, "SMS\\%s.save", filename);
     }
 
@@ -490,7 +481,6 @@ bool load() {
     UINT br;
 
 
-
     f_close(&fd);
 
     return true;
@@ -498,21 +488,21 @@ bool load() {
 
 
 const MenuItem menu_items[] = {
-    {"Swap AB <> BA: %s",     ARRAY, &swap_ab,  nullptr, 1, {"NO ",       "YES"}},
-    {"Frameskip: %s",     ARRAY, &frameskip,  nullptr, 1, {"YES",       "NO "}},
-    //{ "Player 1: %s",        ARRAY, &player_1_input, 2, { "Keyboard ", "Gamepad 1", "Gamepad 2" }},
-    //{ "Player 2: %s",        ARRAY, &player_2_input, 2, { "Keyboard ", "Gamepad 1", "Gamepad 2" }},
-    {},
-    { "Save state: %i", INT, &save_slot, &save, 5 },
-    { "Load state: %i", INT, &save_slot, &load, 5 },
-{},
-{
-    "Overclocking: %s MHz", ARRAY, &frequency_index, &overclock, count_of(frequencies) - 1,
-    { "378", "396", "404", "408", "412", "416", "420", "424", "432" }
-},
-{ "Press START / Enter to apply", NONE },
-    { "Reset to ROM select", ROM_SELECT },
-    { "Return to game", RETURN }
+        { "Swap AB <> BA: %s",            ARRAY, &swap_ab,         nullptr,    1, { "NO ", "YES" }},
+        { "Frameskip: %s",                ARRAY, &frameskip,       nullptr,    1, { "YES", "NO " }},
+        //{ "Player 1: %s",        ARRAY, &player_1_input, 2, { "Keyboard ", "Gamepad 1", "Gamepad 2" }},
+        //{ "Player 2: %s",        ARRAY, &player_2_input, 2, { "Keyboard ", "Gamepad 1", "Gamepad 2" }},
+        {},
+        { "Save state: %i",               INT,   &save_slot,       &save,      5 },
+        { "Load state: %i",               INT,   &save_slot,       &load,      5 },
+        {},
+        {
+          "Overclocking: %s MHz",         ARRAY, &frequency_index, &overclock, count_of(frequencies) - 1,
+                                                                                  { "378", "396", "404", "408", "412", "416", "420", "424", "432" }
+        },
+        { "Press START / Enter to apply", NONE },
+        { "Reset to ROM select",          ROM_SELECT },
+        { "Return to game",               RETURN }
 };
 #define MENU_ITEMS_NUMBER (sizeof(menu_items) / sizeof (MenuItem))
 
@@ -537,13 +527,13 @@ void menu() {
                 color = 0x01;
                 bg_color = 0xFF;
             }
-            const MenuItem* item = &menu_items[i];
+            const MenuItem *item = &menu_items[i];
             if (i == current_item) {
                 switch (item->type) {
                     case INT:
                     case ARRAY:
                         if (item->max_value != 0) {
-                            auto* value = (uint8_t *)item->value;
+                            auto *value = (uint8_t *) item->value;
                             if ((gamepad1_bits.right || keyboard_bits.right) && *value < item->max_value) {
                                 (*value)++;
                             }
@@ -574,10 +564,10 @@ void menu() {
             static char result[TEXTMODE_COLS];
             switch (item->type) {
                 case INT:
-                    snprintf(result, TEXTMODE_COLS, item->text, *(uint8_t *)item->value);
+                    snprintf(result, TEXTMODE_COLS, item->text, *(uint8_t *) item->value);
                     break;
                 case ARRAY:
-                    snprintf(result, TEXTMODE_COLS, item->text, item->value_list[*(uint8_t *)item->value]);
+                    snprintf(result, TEXTMODE_COLS, item->text, item->value_list[*(uint8_t *) item->value]);
                     break;
                 case TEXT:
                     snprintf(result, TEXTMODE_COLS, item->text, item->value);
@@ -618,7 +608,7 @@ void __time_critical_func(render_core)() {
 
     graphics_init();
 
-    const auto buffer = (uint8_t *)SCREEN;
+    const auto buffer = (uint8_t *) SCREEN;
     graphics_set_buffer(buffer, BMP_WIDTH, BMP_HEIGHT);
     graphics_set_textbuffer(buffer);
     graphics_set_bgcolor(0x000000);
@@ -628,7 +618,7 @@ void __time_critical_func(render_core)() {
     sem_acquire_blocking(&vga_start_semaphore);
 
     // 60 FPS loop
-    #define frame_tick (16666)
+#define frame_tick (16666)
     uint64_t tick = time_us_64();
     uint64_t last_frame_tick = tick;
 
@@ -661,6 +651,7 @@ void system_load_sram(void) {
 }
 
 static int audio_buffer[AUDIO_FREQ / 60];
+
 int main() {
     overclock();
 
@@ -680,7 +671,6 @@ int main() {
     }
 
 
-
     i2s_config = i2s_get_default_config();
     i2s_config.sample_freq = AUDIO_FREQ;
     i2s_config.dma_trans_count = AUDIO_FREQ / 60;
@@ -698,9 +688,8 @@ int main() {
     bitmap.height = 192;
     bitmap.depth = 8;
 
-    cart.rom = (uint8_t*)rom;
-    cart.type=TYPE_SMS;
-
+    cart.rom = (uint8_t *) rom;
+    cart.type = TYPE_SMS;
 
 
     while (true) {
@@ -711,7 +700,7 @@ int main() {
         graphics_set_offset(is_gg ? 40 : 16, 24);
         emu_system_init(AUDIO_FREQ);
         cart.type = is_gg ? TYPE_GG : TYPE_SMS;
-        cart.pages= rom_size/0x4000;
+        cart.pages = rom_size / 0x4000;
         system_reset();
 
         start_time = time_us_64();
