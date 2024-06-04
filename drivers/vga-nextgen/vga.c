@@ -118,14 +118,14 @@ void __time_critical_func() dma_handler_VGA() {
         case TGA_320x200x16:
         case EGA_320x200x16x4:
         case GG_160x144:
-            line_number = screen_line / 3;
-            if (screen_line % 2) return;
-            y = screen_line / 3 - graphics_buffer_shift_y;
+            line_number = screen_line / 4;
+            if (screen_line % 4 != 0) return;
+            y = screen_line / 4 - graphics_buffer_shift_y;
             break;
         case GRAPHICSMODE_DEFAULT:
-            line_number = screen_line / 2;
-            if (screen_line % 2) return;
-            y = screen_line / 2 - graphics_buffer_shift_y;
+            line_number = screen_line / 3;
+            if (screen_line % 3 != 0) return;
+            y = screen_line / 3 - graphics_buffer_shift_y;
             break;
 
         case TEXTMODE_160x100:
@@ -314,17 +314,21 @@ void __time_critical_func() dma_handler_VGA() {
         }
         // Это только для sega
         case GRAPHICSMODE_DEFAULT:
+            output_buffer_8bit = (uint8_t *)output_buffer_16bit;
             input_buffer_8bit = input_buffer + y * width;
             for (int i = width; i--;) {
-                *output_buffer_16bit++ = current_palette[*input_buffer_8bit++ & 0x1F];
+                uint16_t color = current_palette[*input_buffer_8bit++ & 0x1F];
+                *output_buffer_8bit++ = color;
+                *output_buffer_8bit++ = color;
+                *output_buffer_8bit++ = color;
             }
             break;
         case GG_160x144:
             input_buffer_8bit = 48 + input_buffer + y * width;
             for (int i = 160; i--;) {
-                uint8_t color = *input_buffer_8bit++ & 0x1F;
-                *output_buffer_16bit++ = current_palette[color];
-                *output_buffer_16bit++ = current_palette[color];
+                uint16_t color = current_palette[*input_buffer_8bit++ & 0x1F];
+                *output_buffer_16bit++ = color;
+                *output_buffer_16bit++ = color;
             }
             break;
         default:
@@ -342,8 +346,8 @@ void graphics_set_mode(enum graphics_mode_t mode) {
         case TEXTMODE_DEFAULT:
         case TEXTMODE_160x100:
         default:
-            text_buffer_width = 80;
-            text_buffer_height = 30;
+            text_buffer_width = TEXTMODE_COLS;
+            text_buffer_height = TEXTMODE_ROWS;
     }
     memset(graphics_buffer, 0, graphics_buffer_height * graphics_buffer_width);
     if (_SM_VGA < 0) return; // если  VGA не инициализирована -
@@ -395,24 +399,24 @@ void graphics_set_mode(enum graphics_mode_t mode) {
 
             TMPL_LINE8 = 0b11000000;
 
-            HS_SHIFT = 768 + 24; // Visible_area + Front Porch
-            HS_SIZE = 104; // Back porch
-            line_size = 976; // Whole line
+            HS_SHIFT = 800 + 40; // Visible_area + Front Porch
+            HS_SIZE = 88; // Back porch
+            line_size = 1056; // Whole line
 
             shift_picture = line_size - HS_SHIFT;
 
             palette16_mask = 0xc0c0;
 
-            visible_line_size = 768 / 2;
+            visible_line_size = 800 / 2;
 
-            N_lines_visible = 576;
+            N_lines_visible = 600;
 
-            line_VS_begin = 576+1; // + Vertical Front porch
-            line_VS_end = 576+1+3;
+            line_VS_begin = 600+1; // Visible area + Vertical Front porch
+            line_VS_end = 600+1+4; // Visible area + Vertical Front porch + Sync pulse
 
-            N_lines_total = 597;
+            N_lines_total = 628;
 
-            fdiv = clock_get_hz(clk_sys) / 34960000.0; //частота пиксельклока
+            fdiv = clock_get_hz(clk_sys) / 40000000.0; //частота пиксельклока
             break;
         default:
             return;

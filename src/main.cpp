@@ -596,7 +596,14 @@ void menu() {
         sleep_ms(125);
     }
 
-    graphics_set_mode(GRAPHICSMODE_DEFAULT);
+
+    if (is_gg) {
+        graphics_set_mode(GG_160x144);
+        graphics_set_offset(32,-20);
+    } else {
+        graphics_set_mode(GRAPHICSMODE_DEFAULT);
+        graphics_set_offset(0, 0);
+    }
 }
 
 /* Renderer loop on Pico's second core */
@@ -612,7 +619,7 @@ void __time_critical_func(render_core)() {
     graphics_set_buffer(buffer, BMP_WIDTH, BMP_HEIGHT);
     graphics_set_textbuffer(buffer);
     graphics_set_bgcolor(0x000000);
-    graphics_set_offset(32, 24);
+    graphics_set_offset(0, 0);
 
     graphics_set_flashmode(false, false);
     sem_acquire_blocking(&vga_start_semaphore);
@@ -697,7 +704,11 @@ int main() {
         graphics_set_mode(TEXTMODE_DEFAULT);
         filebrowser(HOME_DIR, "sms,gg");
         graphics_set_mode(is_gg ? GG_160x144 : GRAPHICSMODE_DEFAULT);
-        graphics_set_offset(is_gg ? 40 : 16, 24);
+        if (is_gg) {
+        graphics_set_offset(32,-20);
+        } else {
+            graphics_set_offset(0, 0);
+        }
         emu_system_init(AUDIO_FREQ);
         cart.type = is_gg ? TYPE_GG : TYPE_SMS;
         cart.pages = rom_size / 0x4000;
