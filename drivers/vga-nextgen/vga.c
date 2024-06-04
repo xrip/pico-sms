@@ -118,6 +118,10 @@ void __time_critical_func() dma_handler_VGA() {
         case TGA_320x200x16:
         case EGA_320x200x16x4:
         case GG_160x144:
+            line_number = screen_line / 3;
+            if (screen_line % 2) return;
+            y = screen_line / 3 - graphics_buffer_shift_y;
+            break;
         case GRAPHICSMODE_DEFAULT:
             line_number = screen_line / 2;
             if (screen_line % 2) return;
@@ -318,7 +322,9 @@ void __time_critical_func() dma_handler_VGA() {
         case GG_160x144:
             input_buffer_8bit = 48 + input_buffer + y * width;
             for (int i = 160; i--;) {
-                *output_buffer_16bit++ = current_palette[*input_buffer_8bit++ & 0x1F];
+                uint8_t color = *input_buffer_8bit++ & 0x1F;
+                *output_buffer_16bit++ = current_palette[color];
+                *output_buffer_16bit++ = current_palette[color];
             }
             break;
         default:
@@ -388,23 +394,25 @@ void graphics_set_mode(enum graphics_mode_t mode) {
         case TGA_320x200x16:
 
             TMPL_LINE8 = 0b11000000;
-            HS_SHIFT = 328 * 2;
-            HS_SIZE = 48 * 2;
 
-            line_size = 400 * 2;
+            HS_SHIFT = 768 + 24; // Visible_area + Front Porch
+            HS_SIZE = 104; // Back porch
+            line_size = 976; // Whole line
 
             shift_picture = line_size - HS_SHIFT;
 
             palette16_mask = 0xc0c0;
 
-            visible_line_size = 320;
+            visible_line_size = 768 / 2;
 
-            N_lines_total = 525;
-            N_lines_visible = 480;
-            line_VS_begin = 490;
-            line_VS_end = 491;
+            N_lines_visible = 576;
 
-            fdiv = clock_get_hz(clk_sys) / 25175000.0; //частота пиксельклока
+            line_VS_begin = 576+1; // + Vertical Front porch
+            line_VS_end = 576+1+3;
+
+            N_lines_total = 597;
+
+            fdiv = clock_get_hz(clk_sys) / 34960000.0; //частота пиксельклока
             break;
         default:
             return;
