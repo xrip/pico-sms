@@ -1,10 +1,25 @@
+# == DO NOT EDIT THE FOLLOWING LINES for the Raspberry Pi Pico VS Code Extension to work ==
+if(WIN32)
+    set(USERHOME $ENV{USERPROFILE})
+else()
+    set(USERHOME $ENV{HOME})
+endif()
+set(sdkVersion 2.1.1)
+set(toolchainVersion 14_2_Rel1)
+set(picotoolVersion 2.1.1)
+set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
+if (EXISTS ${picoVscode})
+    include(${picoVscode})
+endif()
+# ====================================================================================
 cmake_minimum_required(VERSION 3.13)
 set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards )
+set(PICO_PLATFORM "rp2350" CACHE STRING "Chip type")
 set(PICO_BOARD "murmulator" CACHE STRING "Board type")
 include(pico_sdk_import.cmake)
 
 project(sms C CXX ASM)
-SET(BUILD_NAME "${PROJECT_NAME}")
+SET(BUILD_NAME "pico-${PROJECT_NAME}")
 
 option(I2S "Enable I2S sound" OFF)
 option(I2S_CS4334 "Enable I2S CS4334 sound" OFF)
@@ -91,7 +106,6 @@ ELSEIF(SOFTTV)
 	target_link_libraries(${PROJECT_NAME} PRIVATE tv-software)
 	SET(BUILD_NAME "${BUILD_NAME}-TV-SOFT")
 ELSE()
-
 	target_compile_definitions(${PROJECT_NAME} PRIVATE VGA)
 	target_link_libraries(${PROJECT_NAME} PRIVATE vga-nextgen)
 	SET(BUILD_NAME "${BUILD_NAME}-VGA")
@@ -99,6 +113,7 @@ ENDIF()
 
 IF(NOT I2S)
 	target_compile_definitions(${PROJECT_NAME} PRIVATE AUDIO_PWM)
+	SET(BUILD_NAME "${BUILD_NAME}-PWM")
 ELSEIF(I2S_CS4334)
 	target_compile_definitions(${PROJECT_NAME} PRIVATE I2S_CS4334)
 	SET(BUILD_NAME "${BUILD_NAME}-I2S-CS4334")
@@ -132,8 +147,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 		tinyusb_host tinyusb_board
 )
 
+pico_set_linker_script(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/memmap.ld")
 target_link_options(${PROJECT_NAME} PRIVATE -Xlinker --print-memory-usage --data-sections --function-sections)
 pico_add_extra_outputs(${PROJECT_NAME})
-
-
-

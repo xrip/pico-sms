@@ -2,6 +2,7 @@
 #include <cstring>
 #include <hardware/flash.h>
 #include <hardware/vreg.h>
+#include <hardware/watchdog.h>
 #include <pico/multicore.h>
 #include <pico/stdlib.h>
 
@@ -46,7 +47,7 @@ struct input_bits_t {
     bool down: true;
 };
 
-static input_bits_t keyboard_bits = { false, false, false, false, false, false, false, false };
+static input_bits_t keyboard = { false, false, false, false, false, false, false, false };
 static input_bits_t gamepad1_bits = { false, false, false, false, false, false, false, false };
 static input_bits_t gamepad2_bits = { false, false, false, false, false, false, false, false };
 
@@ -56,18 +57,18 @@ void nespad_tick() {
     nespad_read();
 
     if (swap_ab) {
-        gamepad1_bits.a = (nespad_state & DPAD_A) != 0;
-        gamepad1_bits.b = (nespad_state & DPAD_B) != 0;
+        gamepad1_bits.a = keyboard.b || (nespad_state & DPAD_A) != 0;
+        gamepad1_bits.b = keyboard.a || (nespad_state & DPAD_B) != 0;
     } else {
-        gamepad1_bits.b = (nespad_state & DPAD_A) != 0;
-        gamepad1_bits.a = (nespad_state & DPAD_B) != 0;
+        gamepad1_bits.b = keyboard.b || (nespad_state & DPAD_A) != 0;
+        gamepad1_bits.a = keyboard.a || (nespad_state & DPAD_B) != 0;
     }
-    gamepad1_bits.select = (nespad_state & DPAD_SELECT) != 0;
-    gamepad1_bits.start = (nespad_state & DPAD_START) != 0;
-    gamepad1_bits.up = (nespad_state & DPAD_UP) != 0;
-    gamepad1_bits.down = (nespad_state & DPAD_DOWN) != 0;
-    gamepad1_bits.left = (nespad_state & DPAD_LEFT) != 0;
-    gamepad1_bits.right = (nespad_state & DPAD_RIGHT) != 0;
+    gamepad1_bits.select = keyboard.select || (nespad_state & DPAD_SELECT) != 0;
+    gamepad1_bits.start = keyboard.start || (nespad_state & DPAD_START) != 0;
+    gamepad1_bits.up = keyboard.up || (nespad_state & DPAD_UP) != 0;
+    gamepad1_bits.down = keyboard.down || (nespad_state & DPAD_DOWN) != 0;
+    gamepad1_bits.left = keyboard.left || (nespad_state & DPAD_LEFT) != 0;
+    gamepad1_bits.right = keyboard.right || (nespad_state & DPAD_RIGHT) != 0;
 
     int smsButtons = 0;
     int smsSystem = 0;
@@ -94,6 +95,10 @@ static bool isInReport(hid_keyboard_report_t const *report, const unsigned char 
     return false;
 }
 
+volatile bool altPressed = false;
+volatile bool ctrlPressed = false;
+volatile uint8_t fxPressedV = 0;
+
 void
 __not_in_flash_func(process_kbd_report)(hid_keyboard_report_t const *report, hid_keyboard_report_t const *prev_report) {
     /* printf("HID key report modifiers %2.2X report ", report->modifier);
@@ -101,14 +106,42 @@ __not_in_flash_func(process_kbd_report)(hid_keyboard_report_t const *report, hid
         printf("%2.2X", i);
     printf("\r\n");
      */
-    keyboard_bits.start = isInReport(report, HID_KEY_ENTER);
-    keyboard_bits.select = isInReport(report, HID_KEY_BACKSPACE);
-    keyboard_bits.a = isInReport(report, HID_KEY_Z);
-    keyboard_bits.b = isInReport(report, HID_KEY_X);
-    keyboard_bits.up = isInReport(report, HID_KEY_ARROW_UP);
-    keyboard_bits.down = isInReport(report, HID_KEY_ARROW_DOWN);
-    keyboard_bits.left = isInReport(report, HID_KEY_ARROW_LEFT);
-    keyboard_bits.right = isInReport(report, HID_KEY_ARROW_RIGHT);
+    keyboard.start = isInReport(report, HID_KEY_ENTER) || isInReport(report, HID_KEY_KEYPAD_ENTER);
+    keyboard.select = isInReport(report, HID_KEY_BACKSPACE) || isInReport(report, HID_KEY_ESCAPE) || isInReport(report, HID_KEY_KEYPAD_ADD);
+    keyboard.a = isInReport(report, HID_KEY_Z) || isInReport(report, HID_KEY_O) || isInReport(report, HID_KEY_KEYPAD_0);
+    keyboard.b = isInReport(report, HID_KEY_X) || isInReport(report, HID_KEY_P) || isInReport(report, HID_KEY_KEYPAD_DECIMAL);
+
+    bool b7 = isInReport(report, HID_KEY_KEYPAD_7);
+    bool b9 = isInReport(report, HID_KEY_KEYPAD_9);
+    bool b1 = isInReport(report, HID_KEY_KEYPAD_1);
+    bool b3 = isInReport(report, HID_KEY_KEYPAD_3);
+
+    keyboard.up = b7 || b9 || isInReport(report, HID_KEY_ARROW_UP) || isInReport(report, HID_KEY_W) || isInReport(report, HID_KEY_KEYPAD_8);
+    keyboard.down = b1 || b3 || isInReport(report, HID_KEY_ARROW_DOWN) || isInReport(report, HID_KEY_S) || isInReport(report, HID_KEY_KEYPAD_2) || isInReport(report, HID_KEY_KEYPAD_5);
+    keyboard.left = b7 || b1 || isInReport(report, HID_KEY_ARROW_LEFT) || isInReport(report, HID_KEY_A) || isInReport(report, HID_KEY_KEYPAD_4);
+    keyboard.right = b9 || b3 || isInReport(report, HID_KEY_ARROW_RIGHT)  || isInReport(report, HID_KEY_D) || isInReport(report, HID_KEY_KEYPAD_6);
+
+    altPressed = isInReport(report, HID_KEY_ALT_LEFT) || isInReport(report, HID_KEY_ALT_RIGHT);
+    ctrlPressed = isInReport(report, HID_KEY_CONTROL_LEFT) || isInReport(report, HID_KEY_CONTROL_RIGHT);
+    
+    if (altPressed && ctrlPressed && isInReport(report, HID_KEY_DELETE)) {
+        watchdog_enable(10, true);
+        while(true) {
+            tight_loop_contents();
+        }
+    }
+    if (ctrlPressed || altPressed) {
+        uint8_t fxPressed = 0;
+        if (isInReport(report, HID_KEY_F1)) fxPressed = 1;
+        else if (isInReport(report, HID_KEY_F2)) fxPressed = 2;
+        else if (isInReport(report, HID_KEY_F3)) fxPressed = 3;
+        else if (isInReport(report, HID_KEY_F4)) fxPressed = 4;
+        else if (isInReport(report, HID_KEY_F5)) fxPressed = 5;
+        else if (isInReport(report, HID_KEY_F6)) fxPressed = 6;
+        else if (isInReport(report, HID_KEY_F7)) fxPressed = 7;
+        else if (isInReport(report, HID_KEY_F8)) fxPressed = 8;
+        fxPressedV = fxPressed;
+    }
     //-------------------------------------------------------------------------
 }
 
@@ -309,15 +342,15 @@ void filebrowser(const char pathname[256], const char executables[11]) {
             sleep_ms(100);
 
             if (!debounce) {
-                debounce = !(nespad_state & DPAD_START || keyboard_bits.start);
+                debounce = !(nespad_state & DPAD_START || keyboard.start);
             }
 
             // ESCAPE
-            if (nespad_state & DPAD_SELECT || keyboard_bits.select) {
+            if (nespad_state & DPAD_SELECT || keyboard.select) {
                 return;
             }
 
-            if (nespad_state & DPAD_DOWN || keyboard_bits.down) {
+            if (nespad_state & DPAD_DOWN || keyboard.down) {
                 if (offset + (current_item + 1) < total_files) {
                     if (current_item + 1 < per_page) {
                         current_item++;
@@ -327,7 +360,7 @@ void filebrowser(const char pathname[256], const char executables[11]) {
                 }
             }
 
-            if (nespad_state & DPAD_UP || keyboard_bits.up) {
+            if (nespad_state & DPAD_UP || keyboard.up) {
                 if (current_item > 0) {
                     current_item--;
                 } else if (offset > 0) {
@@ -335,14 +368,14 @@ void filebrowser(const char pathname[256], const char executables[11]) {
                 }
             }
 
-            if (nespad_state & DPAD_RIGHT || keyboard_bits.right) {
+            if (nespad_state & DPAD_RIGHT || keyboard.right) {
                 offset += per_page;
                 if (offset + (current_item + 1) > total_files) {
                     offset = total_files - (current_item + 1);
                 }
             }
 
-            if (nespad_state & DPAD_LEFT || keyboard_bits.left) {
+            if (nespad_state & DPAD_LEFT || keyboard.left) {
                 if (offset > per_page) {
                     offset -= per_page;
                 } else {
@@ -351,7 +384,7 @@ void filebrowser(const char pathname[256], const char executables[11]) {
                 }
             }
 
-            if (debounce && (nespad_state & DPAD_START || keyboard_bits.start)) {
+            if (debounce && (nespad_state & DPAD_START || keyboard.start)) {
                 auto file_at_cursor = fileItems[offset + current_item];
 
                 if (file_at_cursor.is_directory) {
@@ -437,7 +470,7 @@ typedef struct __attribute__((__packed__)) {
 } MenuItem;
 
 int save_slot = 0;
-uint16_t frequencies[] = { 378, 396, 404, 408, 412, 416, 420, 424, 432 };
+uint16_t frequencies[] = { 378, 396, 404, 408, 412, 416, 420, 424, 432, 460 };
 uint8_t frequency_index = 0;
 
 bool overclock() {
@@ -509,7 +542,7 @@ const MenuItem menu_items[] = {
         {},
         {
           "Overclocking: %s MHz",         ARRAY, &frequency_index, &overclock, count_of(frequencies) - 1,
-                                                                                  { "378", "396", "404", "408", "412", "416", "420", "424", "432" }
+                                        { "378", "396", "404", "408", "412", "416", "420", "424", "432", "460" }
         },
         { "Press START / Enter to apply", NONE },
         { "Reset to ROM select",          ROM_SELECT },
@@ -545,21 +578,21 @@ void menu() {
                     case ARRAY:
                         if (item->max_value != 0) {
                             auto *value = (uint8_t *) item->value;
-                            if ((gamepad1_bits.right || keyboard_bits.right) && *value < item->max_value) {
+                            if ((gamepad1_bits.right || keyboard.right) && *value < item->max_value) {
                                 (*value)++;
                             }
-                            if ((gamepad1_bits.left || keyboard_bits.left) && *value > 0) {
+                            if ((gamepad1_bits.left || keyboard.left) && *value > 0) {
                                 (*value)--;
                             }
                         }
                         break;
                     case RETURN:
-                        if (gamepad1_bits.start || keyboard_bits.start)
+                        if (gamepad1_bits.start || keyboard.start)
                             exit = true;
                         break;
 
                     case ROM_SELECT:
-                        if (gamepad1_bits.start || keyboard_bits.start) {
+                        if (gamepad1_bits.start || keyboard.start) {
                             reboot = true;
                             return;
                         }
@@ -568,7 +601,7 @@ void menu() {
                         break;
                 }
 
-                if (nullptr != item->callback && (gamepad1_bits.start || keyboard_bits.start)) {
+                if (nullptr != item->callback && (gamepad1_bits.start || keyboard.start)) {
                     exit = item->callback();
                 }
             }
@@ -591,13 +624,13 @@ void menu() {
             draw_text(result, x, y, color, bg_color);
         }
 
-        if (gamepad1_bits.down || keyboard_bits.down) {
+        if (gamepad1_bits.down || keyboard.down) {
             current_item = (current_item + 1) % MENU_ITEMS_NUMBER;
 
             if (menu_items[current_item].type == NONE)
                 current_item++;
         }
-        if (gamepad1_bits.up || keyboard_bits.up) {
+        if (gamepad1_bits.up || keyboard.up) {
             current_item = (current_item - 1 + MENU_ITEMS_NUMBER) % MENU_ITEMS_NUMBER;
 
             if (menu_items[current_item].type == NONE)
@@ -721,10 +754,18 @@ int main() {
             // for(int x = 0; x <64; x++) graphics_set_palette(x, RGB888(bitmap.pal.color[x][0], bitmap.pal.color[x][1], bitmap.pal.color[x][2]));
 
 
-            if ((gamepad1_bits.start && gamepad1_bits.select) || (keyboard_bits.start && keyboard_bits.select)) {
+            if (gamepad1_bits.start && gamepad1_bits.select) {
                 menu();
             }
-
+            if (fxPressedV) {
+                if (altPressed) {
+                    save_slot = fxPressedV;
+                    load();
+                } else if (ctrlPressed) {
+                    save_slot = fxPressedV;
+                    save();
+                }
+            }
 
             frame++;
             if (limit_fps) {
