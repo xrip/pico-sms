@@ -124,6 +124,15 @@ void system_reset(void)
 
 #include "ff.h"
 
+extern UINT32 EA;
+extern int after_EI;
+    
+extern UINT8 SZ[256];		/* zero and sign flags */
+extern UINT8 SZ_BIT[256];	/* zero, sign and parity/overflow (=zero) flags for BIT opcode */
+extern UINT8 SZP[256];		/* zero, sign and parity flags */
+extern UINT8 SZHV_inc[256]; /* zero, sign, half carry and overflow flags INC r8 */
+extern UINT8 SZHV_dec[256]; /* zero, sign, half carry and overflow flags DEC r8 */
+
 void system_save_state(void *fd)
 {
     FIL* f = (FIL*)fd;
@@ -136,7 +145,15 @@ void system_save_state(void *fd)
 
     /* Save Z80 context */
     f_write(f, Z80_Context, sizeof(Z80_Regs), &wb);
+    f_write(f, &EA, sizeof(EA), &wb);
     f_write(f, &after_EI, sizeof(int), &wb);
+    f_write(f, SZ, sizeof(SZ), &wb);
+    f_write(f, SZ_BIT, sizeof(SZ_BIT), &wb);
+    f_write(f, SZP, sizeof(SZP), &wb);
+    f_write(f, SZHV_inc, sizeof(SZHV_inc), &wb);
+    f_write(f, SZHV_dec, sizeof(SZHV_dec), &wb);
+    f_write(f, cpu_readmap, sizeof(cpu_readmap), &wb);
+    f_write(f, cpu_writemap, sizeof(cpu_writemap), &wb);
 
     /* Save YM2413 registers */
     f_write(f, &ym2413.reg[0], 0x40, &wb);
@@ -165,7 +182,15 @@ void system_load_state(void *fd)
 
     /* Load Z80 context */
     f_read(f, Z80_Context, sizeof(Z80_Regs), &rb);
+    f_read(f, &EA, sizeof(EA), &rb);
     f_read(f, &after_EI, sizeof(int), &rb);
+    f_read(f, SZ, sizeof(SZ), &rb);
+    f_read(f, SZ_BIT, sizeof(SZ_BIT), &rb);
+    f_read(f, SZP, sizeof(SZP), &rb);
+    f_read(f, SZHV_inc, sizeof(SZHV_inc), &rb);
+    f_read(f, SZHV_dec, sizeof(SZHV_dec), &rb);
+    f_read(f, cpu_readmap, sizeof(cpu_readmap), &rb);
+    f_read(f, cpu_writemap, sizeof(cpu_writemap), &rb);
 
     /* Load YM2413 registers */
     f_read(f, reg, 0x40, &rb);
@@ -193,19 +218,20 @@ void system_load_state(void *fd)
     cpu_writemap[5] = sms.dummy;
     cpu_writemap[6] = sms.ram;           
     cpu_writemap[7] = sms.ram;
+*/
 
     sms_mapper_w(3, sms.fcr[3]);
     sms_mapper_w(2, sms.fcr[2]);
     sms_mapper_w(1, sms.fcr[1]);
     sms_mapper_w(0, sms.fcr[0]);
-*/
+
     /* Force full pattern cache update */
 //    is_vram_dirty = 1;
 //    memset(vram_dirty, 1, 0x200);
 
     /* Restore palette */
-///    for(i = 0; i < PALETTE_SIZE; i += 1)
-///        palette_sync(i);
+    for(i = 0; i < PALETTE_SIZE; i += 1)
+        palette_sync(i);
 
     /* Restore sound state */
     if(snd.enabled)

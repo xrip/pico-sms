@@ -170,14 +170,14 @@ unsigned char *cpu_writemap[8];
 int z80_ICount;
 static Z80_Regs Z80;
 Z80_Regs *Z80_Context = &Z80;
-static UINT32 EA;
+UINT32 EA;
 int after_EI = 0;
 
-static UINT8 SZ[256];		/* zero and sign flags */
-static UINT8 SZ_BIT[256];	/* zero, sign and parity/overflow (=zero) flags for BIT opcode */
-static UINT8 SZP[256];		/* zero, sign and parity flags */
-static UINT8 SZHV_inc[256]; /* zero, sign, half carry and overflow flags INC r8 */
-static UINT8 SZHV_dec[256]; /* zero, sign, half carry and overflow flags DEC r8 */
+UINT8 SZ[256];		/* zero and sign flags */
+UINT8 SZ_BIT[256];	/* zero, sign and parity/overflow (=zero) flags for BIT opcode */
+UINT8 SZP[256];		/* zero, sign and parity flags */
+UINT8 SZHV_inc[256]; /* zero, sign, half carry and overflow flags INC r8 */
+UINT8 SZHV_dec[256]; /* zero, sign, half carry and overflow flags DEC r8 */
 #include "z80daa.h"
 #if BIG_FLAGS_ARRAY
 #include <signal.h>
