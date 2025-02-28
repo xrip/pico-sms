@@ -15,11 +15,12 @@ endif()
 cmake_minimum_required(VERSION 3.13)
 set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards )
 set(PICO_PLATFORM "rp2350" CACHE STRING "Chip type")
+#set(PICO_PLATFORM "rp2040" CACHE STRING "Chip type")
 set(PICO_BOARD "murmulator" CACHE STRING "Board type")
 include(pico_sdk_import.cmake)
 
 project(sms C CXX ASM)
-SET(BUILD_NAME "pico-${PROJECT_NAME}")
+SET(BUILD_NAME "m1p2-${PROJECT_NAME}")
 
 option(I2S "Enable I2S sound" OFF)
 option(I2S_CS4334 "Enable I2S CS4334 sound" OFF)
@@ -30,6 +31,7 @@ option(HDMI "Enable HDMI display" OFF)
 option(TV "Enable TV composite output" OFF)
 option(SOFTTV "Enable TV soft composite output" OFF)
 
+set(I2S ON)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -73,10 +75,6 @@ add_executable(${PROJECT_NAME} ${SRC})
 pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
 target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
 pico_set_boot_stage2(${PROJECT_NAME} slower_boot2)
-
-
-set(FAMILY rp2040)
-set(BOARD pico_sdk)
 
 pico_set_program_name(sms "Sega Master System emulator by xrip for MURMULATOR devboard")
 pico_set_program_version(sms "develop")
@@ -147,6 +145,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 		tinyusb_host tinyusb_board
 )
 
-pico_set_linker_script(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/memmap.ld")
+#pico_set_linker_script(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/memmap.ld")
 target_link_options(${PROJECT_NAME} PRIVATE -Xlinker --print-memory-usage --data-sections --function-sections)
 pico_add_extra_outputs(${PROJECT_NAME})

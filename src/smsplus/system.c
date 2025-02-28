@@ -108,7 +108,6 @@ void system_shutdown(void)
     }
 }
 
-
 void system_reset(void)
 {
     cpu_reset();
@@ -123,24 +122,27 @@ void system_reset(void)
     }
 }
 
+#include "ff.h"
 
 void system_save_state(void *fd)
 {
+    FIL* f = (FIL*)fd;
+    UINT wb;
     /* Save VDP context */
-    fwrite(&vdp, sizeof(t_vdp), 1, fd);
+    f_write(f, &vdp, sizeof(t_vdp), &wb);
 
     /* Save SMS context */
-    fwrite(&sms, sizeof(t_sms), 1, fd);
+    f_write(f, &sms, sizeof(t_sms), &wb);
 
     /* Save Z80 context */
-    fwrite(Z80_Context, sizeof(Z80_Regs), 1, fd);
-    fwrite(&after_EI, sizeof(int), 1, fd);
+    f_write(f, Z80_Context, sizeof(Z80_Regs), &wb);
+    f_write(f, &after_EI, sizeof(int), &wb);
 
     /* Save YM2413 registers */
-    fwrite(&ym2413.reg[0], 0x40, 1, fd);
+    f_write(f, &ym2413.reg[0], 0x40, &wb);
 
     /* Save SN76489 context */
-    fwrite(&sn[0], sizeof(t_SN76496), 1, fd);
+    f_write(f, &sn[0], sizeof(t_SN76496), &wb);
 }
 
 
@@ -150,37 +152,39 @@ void system_load_state(void *fd)
     uint8 reg[0x40];
 
     /* Initialize everything */
-    cpu_reset();
-    system_reset();
+///    cpu_reset();
+///    system_reset();
 
+    FIL* f = (FIL*)fd;
+    UINT rb;
     /* Load VDP context */
-    fread(&vdp, sizeof(t_vdp), 1, fd);
+    f_read(f, &vdp, sizeof(t_vdp), &rb);
 
     /* Load SMS context */
-    fread(&sms, sizeof(t_sms), 1, fd);
+    f_read(f, &sms, sizeof(t_sms), &rb);
 
     /* Load Z80 context */
-    fread(Z80_Context, sizeof(Z80_Regs), 1, fd);
-    fread(&after_EI, sizeof(int), 1, fd);
+    f_read(f, Z80_Context, sizeof(Z80_Regs), &rb);
+    f_read(f, &after_EI, sizeof(int), &rb);
 
     /* Load YM2413 registers */
-    fread(reg, 0x40, 1, fd);
+    f_read(f, reg, 0x40, &rb);
 
     /* Load SN76489 context */
-    fread(&sn[0], sizeof(t_SN76496), 1, fd);
+    f_read(f, &sn[0], sizeof(t_SN76496), &rb);
 
     /* Restore callbacks */
-    z80_set_irq_callback(sms_irq_callback);
+///    z80_set_irq_callback(sms_irq_callback);
 
-    cpu_readmap[0] = cart.rom + 0x0000; /* 0000-3FFF */
-    cpu_readmap[1] = cart.rom + 0x2000;
-    cpu_readmap[2] = cart.rom + 0x4000; /* 4000-7FFF */
-    cpu_readmap[3] = cart.rom + 0x6000;
-    cpu_readmap[4] = cart.rom + 0x0000; /* 0000-3FFF */
-    cpu_readmap[5] = cart.rom + 0x2000;
-    cpu_readmap[6] = sms.ram;
-    cpu_readmap[7] = sms.ram;
-
+///    cpu_readmap[0] = cart.rom + 0x0000; /* 0000-3FFF */
+///    cpu_readmap[1] = cart.rom + 0x2000;
+///    cpu_readmap[2] = cart.rom + 0x4000; /* 4000-7FFF */
+///    cpu_readmap[3] = cart.rom + 0x6000;
+///    cpu_readmap[4] = cart.rom + 0x0000; /* 0000-3FFF */
+///    cpu_readmap[5] = cart.rom + 0x2000;
+///    cpu_readmap[6] = sms.ram;
+///    cpu_readmap[7] = sms.ram;
+/**
     cpu_writemap[0] = sms.dummy;
     cpu_writemap[1] = sms.dummy;
     cpu_writemap[2] = sms.dummy;         
@@ -194,14 +198,14 @@ void system_load_state(void *fd)
     sms_mapper_w(2, sms.fcr[2]);
     sms_mapper_w(1, sms.fcr[1]);
     sms_mapper_w(0, sms.fcr[0]);
-
+*/
     /* Force full pattern cache update */
 //    is_vram_dirty = 1;
 //    memset(vram_dirty, 1, 0x200);
 
     /* Restore palette */
-    for(i = 0; i < PALETTE_SIZE; i += 1)
-        palette_sync(i);
+///    for(i = 0; i < PALETTE_SIZE; i += 1)
+///        palette_sync(i);
 
     /* Restore sound state */
     if(snd.enabled)
