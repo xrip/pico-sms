@@ -309,18 +309,34 @@ void __time_critical_func() dma_handler_VGA() {
             break;
         }
         // Это только для sega
-        case GRAPHICSMODE_DEFAULT:
+        case GRAPHICSMODE_DEFAULT: {
+            uint16_t c0 = current_palette[0];
+            for (int i = (320 - width) >> 1; i--;) {
+                *output_buffer_16bit++ = c0;
+            }
             input_buffer_8bit = input_buffer + y * width;
             for (int i = width; i--;) {
                 *output_buffer_16bit++ = current_palette[*input_buffer_8bit++ & 0x1F];
             }
+            for (int i = (320 - width) >> 1; i--;) {
+                *output_buffer_16bit++ = c0;
+            }
             break;
-        case GG_160x144:
+        }
+        case GG_160x144: {
+            uint16_t c0 = current_palette[0];
+            for (int i = (320 - 160) >> 1; i--;) {
+                *output_buffer_16bit++ = c0;
+            }
             input_buffer_8bit = 48 + input_buffer + y * width;
             for (int i = 160; i--;) {
                 *output_buffer_16bit++ = current_palette[*input_buffer_8bit++ & 0x1F];
             }
+            for (int i = (320 - 160) >> 1; i--;) {
+                *output_buffer_16bit++ = c0;
+            }
             break;
+        }
         default:
             break;
     }
