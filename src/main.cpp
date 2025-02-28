@@ -34,7 +34,7 @@ bool frameskip = true;
 bool limit_fps = false;
 semaphore vga_start_semaphore;
 
-uint8_t SCREEN[192][256];
+extern "C" uint8_t SCREEN[192][256];
 
 struct input_bits_t {
     bool a: true;

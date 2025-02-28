@@ -133,6 +133,16 @@ extern UINT8 SZP[256];		/* zero, sign and parity flags */
 extern UINT8 SZHV_inc[256]; /* zero, sign, half carry and overflow flags INC r8 */
 extern UINT8 SZHV_dec[256]; /* zero, sign, half carry and overflow flags DEC r8 */
 
+uint8_t SCREEN[192][256] = { 0 };
+
+#define CACHEDTILES 512
+extern int16 cachePtr[512*4];				//(tile+attr<<9) -> cache tile store index (i<<6); -1 if not cached
+extern uint8 cacheStore[CACHEDTILES*64];	//Tile store
+extern uint8 cacheStoreUsed[CACHEDTILES];	//Marks if a tile is used
+extern uint8 is_vram_dirty;
+extern int cacheKillPtr;
+extern int freePtr;
+
 void system_save_state(void *fd)
 {
     FIL* f = (FIL*)fd;
@@ -160,6 +170,14 @@ void system_save_state(void *fd)
 
     /* Save SN76489 context */
     f_write(f, &sn[0], sizeof(t_SN76496), &wb);
+
+    f_write(f, SCREEN, sizeof(SCREEN), &wb);
+    f_write(f, cachePtr, sizeof(cachePtr), &wb);
+    f_write(f, cacheStore, sizeof(cacheStore), &wb);
+    f_write(f, cacheStoreUsed, sizeof(cacheStoreUsed), &wb);
+    f_write(f, &is_vram_dirty, sizeof(is_vram_dirty), &wb);
+    f_write(f, &cacheKillPtr, sizeof(cacheKillPtr), &wb);
+    f_write(f, &freePtr, sizeof(freePtr), &wb);
 }
 
 
@@ -198,8 +216,16 @@ void system_load_state(void *fd)
     /* Load SN76489 context */
     f_read(f, &sn[0], sizeof(t_SN76496), &rb);
 
+    f_read(f, SCREEN, sizeof(SCREEN), &rb);
+    f_read(f, cachePtr, sizeof(cachePtr), &rb);
+    f_read(f, cacheStore, sizeof(cacheStore), &rb);
+    f_read(f, cacheStoreUsed, sizeof(cacheStoreUsed), &rb);
+    f_read(f, &is_vram_dirty, sizeof(is_vram_dirty), &rb);
+    f_read(f, &cacheKillPtr, sizeof(cacheKillPtr), &rb);
+    f_read(f, &freePtr, sizeof(freePtr), &rb);
+
     /* Restore callbacks */
-///    z80_set_irq_callback(sms_irq_callback);
+    z80_set_irq_callback(sms_irq_callback);
 
 ///    cpu_readmap[0] = cart.rom + 0x0000; /* 0000-3FFF */
 ///    cpu_readmap[1] = cart.rom + 0x2000;
@@ -218,12 +244,12 @@ void system_load_state(void *fd)
     cpu_writemap[5] = sms.dummy;
     cpu_writemap[6] = sms.ram;           
     cpu_writemap[7] = sms.ram;
-*/
 
     sms_mapper_w(3, sms.fcr[3]);
     sms_mapper_w(2, sms.fcr[2]);
     sms_mapper_w(1, sms.fcr[1]);
     sms_mapper_w(0, sms.fcr[0]);
+*/
 
     /* Force full pattern cache update */
 //    is_vram_dirty = 1;

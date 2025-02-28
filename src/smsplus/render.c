@@ -29,7 +29,7 @@ int freePtr=0;
 #include "lut.h"
 
 /* Attribute expansion table */
-uint32 atex[4] =
+static const uint32 atex[4] =
 {
     0x00000000,
     0x10101010,
