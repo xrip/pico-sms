@@ -53,6 +53,32 @@ static input_bits_t gamepad2_bits = { false, false, false, false, false, false, 
 
 bool swap_ab = false;
 
+void load_config() {
+    FIL file;
+    char pathname[256];
+    sprintf(pathname, "%s\\emulator.cfg", HOME_DIR);
+
+    if (FR_OK == f_mount(&fs, "", 1) && FR_OK == f_open(&file, pathname, FA_READ)) {
+        UINT bytes_read;
+        f_read(&file, &swap_ab, sizeof(swap_ab), &bytes_read);
+//        f_read(&file, &frequency_index, sizeof(frequency_index), &bytes_read);
+        f_close(&file);
+    }
+}
+
+void save_config() {
+    FIL file;
+    char pathname[256];
+    sprintf(pathname, "%s\\emulator.cfg", HOME_DIR);
+
+    if (FR_OK == f_mount(&fs, "", 1) && FR_OK == f_open(&file, pathname, FA_CREATE_ALWAYS | FA_WRITE)) {
+        UINT bytes_writen;
+        f_write(&file, &swap_ab, sizeof(swap_ab), &bytes_writen);
+//        f_write(&file, &frequency_index, sizeof(frequency_index), &bytes_writen);
+        f_close(&file);
+    }
+}
+
 void nespad_tick() {
     nespad_read();
 
@@ -269,11 +295,6 @@ void filebrowser(const char pathname[256], const char executables[11]) {
 
     DIR dir;
     FILINFO fileInfo;
-
-    if (FR_OK != f_mount(&fs, "SD", 1)) {
-        draw_text("SD Card not inserted or SD Card error!", 0, 0, 12, 0);
-        while (true);
-    }
 
     while (true) {
         memset(fileItems, 0, sizeof(file_item_t) * max_files);
@@ -499,9 +520,8 @@ bool save() {
         sprintf(pathname, "SMS\\%s.save", filename);
     }
 
-    FRESULT fr = f_mount(&fs, "", 1);
     FIL fd;
-    fr = f_open(&fd, pathname, FA_CREATE_ALWAYS | FA_WRITE);
+    FRESULT fr = f_open(&fd, pathname, FA_CREATE_ALWAYS | FA_WRITE);
     UINT br;
 
 
@@ -519,9 +539,8 @@ bool load() {
         sprintf(pathname, "SMS\\%s.save", filename);
     }
 
-    FRESULT fr = f_mount(&fs, "", 1);
     FIL fd;
-    fr = f_open(&fd, pathname, FA_READ);
+    FRESULT fr = f_open(&fd, pathname, FA_READ);
     UINT br;
 
 
@@ -594,6 +613,7 @@ void menu() {
                     case ROM_SELECT:
                         if (gamepad1_bits.start || keyboard.start) {
                             reboot = true;
+                            save_config();
                             return;
                         }
                         break;
@@ -639,7 +659,7 @@ void menu() {
 
         sleep_ms(125);
     }
-
+    save_config();
     graphics_set_mode(GRAPHICSMODE_DEFAULT);
 }
 
@@ -697,6 +717,9 @@ void system_load_sram(void) {
 static int audio_buffer[AUDIO_FREQ / 60];
 
 int main() {
+    f_mount(&fs, "SD", 1);
+    load_config();
+
     overclock();
 
     sem_init(&vga_start_semaphore, 0, 1);
