@@ -36,7 +36,12 @@ void save_render(FIL* f) {
 
 void load_render(FIL* f) {
     UINT rb;
-
+    f_read(f, cachePtr, sizeof(cachePtr), &rb);
+    f_read(f, cacheStore, sizeof(cacheStore), &rb);
+    f_read(f, cacheStoreUsed, sizeof(cacheStoreUsed), &rb);
+    f_read(f, &is_vram_dirty, sizeof(is_vram_dirty), &rb);
+    f_read(f, &cacheKillPtr, sizeof(cacheKillPtr), &rb);
+    f_read(f, &freePtr, sizeof(freePtr), &rb);
 }
 
 /* Pixel look-up table */
