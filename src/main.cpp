@@ -58,7 +58,7 @@ void load_config() {
     char pathname[256];
     sprintf(pathname, "%s\\emulator.cfg", HOME_DIR);
 
-    if (FR_OK == f_mount(&fs, "", 1) && FR_OK == f_open(&file, pathname, FA_READ)) {
+    if (FR_OK == f_open(&file, pathname, FA_READ)) {
         UINT bytes_read;
         f_read(&file, &swap_ab, sizeof(swap_ab), &bytes_read);
 //        f_read(&file, &frequency_index, sizeof(frequency_index), &bytes_read);
@@ -71,7 +71,7 @@ void save_config() {
     char pathname[256];
     sprintf(pathname, "%s\\emulator.cfg", HOME_DIR);
 
-    if (FR_OK == f_mount(&fs, "", 1) && FR_OK == f_open(&file, pathname, FA_CREATE_ALWAYS | FA_WRITE)) {
+    if (FR_OK == f_open(&file, pathname, FA_CREATE_ALWAYS | FA_WRITE)) {
         UINT bytes_writen;
         f_write(&file, &swap_ab, sizeof(swap_ab), &bytes_writen);
 //        f_write(&file, &frequency_index, sizeof(frequency_index), &bytes_writen);
@@ -492,17 +492,13 @@ typedef struct __attribute__((__packed__)) {
 
 int save_slot = 0;
 uint16_t frequencies[] = { 378, 396, 404, 408, 412, 416, 420, 424, 432, 460 };
-#if PICO_RP2350
 uint8_t frequency_index = 0;
-#else
-uint8_t frequency_index = 0;
-#endif
 
 bool overclock() {
 #if PICO_RP2350
     volatile uint32_t *qmi_m0_timing=(uint32_t *)0x400d000c;
     vreg_disable_voltage_limit();
-    vreg_set_voltage(VREG_VOLTAGE_1_60);
+    vreg_set_voltage(VREG_VOLTAGE_1_40);
     sleep_ms(10);
     *qmi_m0_timing = 0x60007204;
     set_sys_clock_khz(frequencies[frequency_index] * KHZ, false);
@@ -721,10 +717,10 @@ void system_load_sram(void) {
 static int audio_buffer[AUDIO_FREQ / 60];
 
 int main() {
-    overclock();
-
     f_mount(&fs, "SD", 1);
     load_config();
+
+    overclock();
 
     sem_init(&vga_start_semaphore, 0, 1);
     multicore_launch_core1(render_core);

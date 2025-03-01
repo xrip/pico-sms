@@ -8,6 +8,7 @@
 /* Used for blanking a line in whole or in part */
 #define BACKDROP_COLOR      (0x10 | (vdp.reg[7] & 0x0F))
 
+#include "ff.h"
 
 /* Function prototypes */
 void render_init(void);
@@ -19,6 +20,8 @@ void render_line(int line);
 void update_cache(void);
 void palette_sync(int index);
 void remap_8_to_16(int line);
+void save_render(FIL*);
+void load_render(FIL*);
 
 void vramMarkTileDirty(int tile);
 

@@ -15,14 +15,29 @@ uint8 *linebuf;
 #define CACHEDTILES 512
 #define ALIGN_DWORD 0 //esp doesn't support unaligned word writes
 
-int16 cachePtr[512*4];				//(tile+attr<<9) -> cache tile store index (i<<6); -1 if not cached
-uint8 cacheStore[CACHEDTILES*64];	//Tile store
-uint8 cacheStoreUsed[CACHEDTILES];	//Marks if a tile is used
+static int16 cachePtr[512*4];				//(tile+attr<<9) -> cache tile store index (i<<6); -1 if not cached
+static uint8 cacheStore[CACHEDTILES*64];	//Tile store
+static uint8 cacheStoreUsed[CACHEDTILES];	//Marks if a tile is used
 
-uint8 is_vram_dirty;
+static uint8 is_vram_dirty;
 
-int cacheKillPtr=0;
-int freePtr=0;
+static int cacheKillPtr = 0;
+static int freePtr = 0;
+
+void save_render(FIL* f) {
+    UINT wb;
+    f_write(f, cachePtr, sizeof(cachePtr), &wb);
+    f_write(f, cacheStore, sizeof(cacheStore), &wb);
+    f_write(f, cacheStoreUsed, sizeof(cacheStoreUsed), &wb);
+    f_write(f, &is_vram_dirty, sizeof(is_vram_dirty), &wb);
+    f_write(f, &cacheKillPtr, sizeof(cacheKillPtr), &wb);
+    f_write(f, &freePtr, sizeof(freePtr), &wb);
+}
+
+void load_render(FIL* f) {
+    UINT rb;
+
+}
 
 /* Pixel look-up table */
 //uint8 lut[0x10000];

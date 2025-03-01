@@ -4,7 +4,7 @@
 //#define CLEAR_LINE      0       /* clear (a fired, held or pulsed) line */
 //#define ASSERT_LINE     1       /* assert an interrupt immediately */
 
-
+#include "ff.h"
 #include "cpuintrf.h"
 #include "osd_cpu.h"
 
@@ -44,6 +44,8 @@ extern void z80_state_save(void *file);
 extern void z80_state_load(void *file);
 extern const char *z80_info(void *context, int regnum);
 extern unsigned z80_dasm(char *buffer, unsigned pc);
+void save_z80(FIL* f);
+void load_z80(FIL* f);
 
 #ifdef MAME_DEBUG
 extern unsigned DasmZ80(char *buffer, unsigned pc);

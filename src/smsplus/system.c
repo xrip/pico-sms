@@ -122,26 +122,7 @@ void system_reset(void)
     }
 }
 
-#include "ff.h"
-
-extern UINT32 EA;
-extern int after_EI;
-    
-extern UINT8 SZ[256];		/* zero and sign flags */
-extern UINT8 SZ_BIT[256];	/* zero, sign and parity/overflow (=zero) flags for BIT opcode */
-extern UINT8 SZP[256];		/* zero, sign and parity flags */
-extern UINT8 SZHV_inc[256]; /* zero, sign, half carry and overflow flags INC r8 */
-extern UINT8 SZHV_dec[256]; /* zero, sign, half carry and overflow flags DEC r8 */
-
 uint8_t SCREEN[192][256] = { 0 };
-
-#define CACHEDTILES 512
-extern int16 cachePtr[512*4];				//(tile+attr<<9) -> cache tile store index (i<<6); -1 if not cached
-extern uint8 cacheStore[CACHEDTILES*64];	//Tile store
-extern uint8 cacheStoreUsed[CACHEDTILES];	//Marks if a tile is used
-extern uint8 is_vram_dirty;
-extern int cacheKillPtr;
-extern int freePtr;
 
 void system_save_state(void *fd)
 {
@@ -154,16 +135,7 @@ void system_save_state(void *fd)
     f_write(f, &sms, sizeof(t_sms), &wb);
 
     /* Save Z80 context */
-    f_write(f, Z80_Context, sizeof(Z80_Regs), &wb);
-    f_write(f, &EA, sizeof(EA), &wb);
-    f_write(f, &after_EI, sizeof(int), &wb);
-    f_write(f, SZ, sizeof(SZ), &wb);
-    f_write(f, SZ_BIT, sizeof(SZ_BIT), &wb);
-    f_write(f, SZP, sizeof(SZP), &wb);
-    f_write(f, SZHV_inc, sizeof(SZHV_inc), &wb);
-    f_write(f, SZHV_dec, sizeof(SZHV_dec), &wb);
-    f_write(f, cpu_readmap, sizeof(cpu_readmap), &wb);
-    f_write(f, cpu_writemap, sizeof(cpu_writemap), &wb);
+    save_z80(f);
 
     /* Save YM2413 registers */
     f_write(f, &ym2413.reg[0], 0x40, &wb);
@@ -172,12 +144,7 @@ void system_save_state(void *fd)
     f_write(f, &sn[0], sizeof(t_SN76496), &wb);
 
     f_write(f, SCREEN, sizeof(SCREEN), &wb);
-    f_write(f, cachePtr, sizeof(cachePtr), &wb);
-    f_write(f, cacheStore, sizeof(cacheStore), &wb);
-    f_write(f, cacheStoreUsed, sizeof(cacheStoreUsed), &wb);
-    f_write(f, &is_vram_dirty, sizeof(is_vram_dirty), &wb);
-    f_write(f, &cacheKillPtr, sizeof(cacheKillPtr), &wb);
-    f_write(f, &freePtr, sizeof(freePtr), &wb);
+    save_render(f);
 }
 
 
@@ -199,16 +166,7 @@ void system_load_state(void *fd)
     f_read(f, &sms, sizeof(t_sms), &rb);
 
     /* Load Z80 context */
-    f_read(f, Z80_Context, sizeof(Z80_Regs), &rb);
-    f_read(f, &EA, sizeof(EA), &rb);
-    f_read(f, &after_EI, sizeof(int), &rb);
-    f_read(f, SZ, sizeof(SZ), &rb);
-    f_read(f, SZ_BIT, sizeof(SZ_BIT), &rb);
-    f_read(f, SZP, sizeof(SZP), &rb);
-    f_read(f, SZHV_inc, sizeof(SZHV_inc), &rb);
-    f_read(f, SZHV_dec, sizeof(SZHV_dec), &rb);
-    f_read(f, cpu_readmap, sizeof(cpu_readmap), &rb);
-    f_read(f, cpu_writemap, sizeof(cpu_writemap), &rb);
+    load_z80(f);
 
     /* Load YM2413 registers */
     f_read(f, reg, 0x40, &rb);
@@ -217,12 +175,7 @@ void system_load_state(void *fd)
     f_read(f, &sn[0], sizeof(t_SN76496), &rb);
 
     f_read(f, SCREEN, sizeof(SCREEN), &rb);
-    f_read(f, cachePtr, sizeof(cachePtr), &rb);
-    f_read(f, cacheStore, sizeof(cacheStore), &rb);
-    f_read(f, cacheStoreUsed, sizeof(cacheStoreUsed), &rb);
-    f_read(f, &is_vram_dirty, sizeof(is_vram_dirty), &rb);
-    f_read(f, &cacheKillPtr, sizeof(cacheKillPtr), &rb);
-    f_read(f, &freePtr, sizeof(freePtr), &rb);
+    load_render(f);
 
     /* Restore callbacks */
     z80_set_irq_callback(sms_irq_callback);
