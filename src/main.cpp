@@ -51,30 +51,24 @@ static input_bits_t keyboard = { false, false, false, false, false, false, false
 static input_bits_t gamepad1_bits = { false, false, false, false, false, false, false, false };
 static input_bits_t gamepad2_bits = { false, false, false, false, false, false, false, false };
 
-bool swap_ab = false;
+static bool swap_ab = false;
+static FIL file;
+static char pathname[256];
 
 void load_config() {
-    FIL file;
-    char pathname[256];
-    sprintf(pathname, "%s\\emulator.cfg", HOME_DIR);
-
+    snprintf(pathname, sizeof(pathname), "%s\\emulator.cfg", HOME_DIR);
     if (FR_OK == f_open(&file, pathname, FA_READ)) {
         UINT bytes_read;
         f_read(&file, &swap_ab, sizeof(swap_ab), &bytes_read);
-//        f_read(&file, &frequency_index, sizeof(frequency_index), &bytes_read);
         f_close(&file);
     }
 }
 
 void save_config() {
-    FIL file;
-    char pathname[256];
-    sprintf(pathname, "%s\\emulator.cfg", HOME_DIR);
-
+    snprintf(pathname, sizeof(pathname), "%s\\emulator.cfg", HOME_DIR);
     if (FR_OK == f_open(&file, pathname, FA_CREATE_ALWAYS | FA_WRITE)) {
         UINT bytes_writen;
         f_write(&file, &swap_ab, sizeof(swap_ab), &bytes_writen);
-//        f_write(&file, &frequency_index, sizeof(frequency_index), &bytes_writen);
         f_close(&file);
     }
 }
@@ -105,7 +99,7 @@ void nespad_tick() {
     if (gamepad1_bits.a) smsButtons |= INPUT_BUTTON1;
     if (gamepad1_bits.b) smsButtons |= INPUT_BUTTON2;
     if (gamepad1_bits.start) smsSystem |= INPUT_START;
-    if (gamepad1_bits.select) smsSystem |= INPUT_PAUSE;
+    // if (gamepad1_bits.select) smsSystem |= INPUT_PAUSE;
     // if (gamepad1_bits.down) smsSystem|=INPUT_SOFT_RESET;
     // if (gamepad1_bits.down) smsSystem|=INPUT_HARD_RESET;
     input.pad[0] = smsButtons;
@@ -230,7 +224,6 @@ bool isExecutable(const char pathname[255], const char *extensions) {
 
 bool filebrowser_loadfile(const char pathname[256]) {
     UINT bytes_read = 0;
-    FIL file;
 
     constexpr int window_y = (TEXTMODE_ROWS - 5) / 2;
     constexpr int window_x = (TEXTMODE_COLS - 43) / 2;
@@ -512,40 +505,30 @@ bool overclock() {
 }
 
 bool save() {
-    char pathname[255];
-
     if (save_slot) {
-        sprintf(pathname, "SMS\\%s_%d.save", filename, save_slot);
+        snprintf(pathname, sizeof(pathname), "SMS\\%s_%d.save", filename, save_slot);
     } else {
-        sprintf(pathname, "SMS\\%s.save", filename);
+        snprintf(pathname, sizeof(pathname), "SMS\\%s.save", filename);
     }
-
-    FIL fd;
-    FRESULT fr = f_open(&fd, pathname, FA_CREATE_ALWAYS | FA_WRITE);
-    system_save_state(&fd);
+    FRESULT fr = f_open(&file, pathname, FA_CREATE_ALWAYS | FA_WRITE);
+    system_save_state(&file);
     UINT wb;
-    f_write(&fd, &is_gg, sizeof(is_gg), &wb);
-    f_close(&fd);
-
+    f_write(&file, &is_gg, sizeof(is_gg), &wb);
+    f_close(&file);
     return true;
 }
 
 bool load() {
-    char pathname[255];
-
     if (save_slot) {
-        sprintf(pathname, "SMS\\%s_%d.save", filename, save_slot);
+        snprintf(pathname, sizeof(pathname), "SMS\\%s_%d.save", filename, save_slot);
     } else {
-        sprintf(pathname, "SMS\\%s.save", filename);
+        snprintf(pathname, sizeof(pathname), "SMS\\%s.save", filename);
     }
-
-    FIL fd;
-    FRESULT fr = f_open(&fd, pathname, FA_READ);
-    system_load_state(&fd);
+    FRESULT fr = f_open(&file, pathname, FA_READ);
+    system_load_state(&file);
     UINT rb;
-    f_read(&fd, &is_gg, sizeof(is_gg), &rb);
-    f_close(&fd);
-
+    f_read(&file, &is_gg, sizeof(is_gg), &rb);
+    f_close(&file);
     return true;
 }
 
@@ -579,6 +562,7 @@ void menu() {
              __TIME__);
     draw_text(footer, TEXTMODE_COLS / 2 - strlen(footer) / 2, TEXTMODE_ROWS - 1, 11, 1);
     uint current_item = 0;
+    uint64_t time = time_us_64();
 
     while (!exit) {
         for (int i = 0; i < MENU_ITEMS_NUMBER; i++) {
@@ -656,6 +640,8 @@ void menu() {
             if (menu_items[current_item].type == NONE)
                 current_item--;
         }
+        if (time_us_64() - time > 500 && gamepad1_bits.select && !gamepad1_bits.start)
+            break;
 
         sleep_ms(125);
     }
