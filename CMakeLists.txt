@@ -1,10 +1,25 @@
+# == DO NOT EDIT THE FOLLOWING LINES for the Raspberry Pi Pico VS Code Extension to work ==
+if(WIN32)
+    set(USERHOME $ENV{USERPROFILE})
+else()
+    set(USERHOME $ENV{HOME})
+endif()
+set(sdkVersion 2.1.1)
+set(toolchainVersion 14_2_Rel1)
+set(picotoolVersion 2.1.1)
+set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
+if (EXISTS ${picoVscode})
+    include(${picoVscode})
+endif()
+# ====================================================================================
 cmake_minimum_required(VERSION 3.13)
 set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards )
+set(PICO_PLATFORM "rp2350" CACHE STRING "Chip type")
+#set(PICO_PLATFORM "rp2040" CACHE STRING "Chip type")
 set(PICO_BOARD "murmulator" CACHE STRING "Board type")
 include(pico_sdk_import.cmake)
 
 project(sms C CXX ASM)
-SET(BUILD_NAME "${PROJECT_NAME}")
 
 option(I2S "Enable I2S sound" OFF)
 option(I2S_CS4334 "Enable I2S CS4334 sound" OFF)
@@ -14,7 +29,9 @@ option(ILI9341 "Enable TFT ILI9341 display" OFF)
 option(HDMI "Enable HDMI display" OFF)
 option(TV "Enable TV composite output" OFF)
 option(SOFTTV "Enable TV soft composite output" OFF)
-
+if( ${PICO_PLATFORM} MATCHES "rp2350" )
+option(m1p2launcher "Enable m1p2-launcher support" OFF)
+endif()
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -55,13 +72,17 @@ message(STATUS "")
 
 add_executable(${PROJECT_NAME} ${SRC})
 
-pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
-target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
-pico_set_boot_stage2(${PROJECT_NAME} slower_boot2)
-
-
-set(FAMILY rp2040)
-set(BOARD pico_sdk)
+if( ${PICO_PLATFORM} MATCHES "rp2040" )
+	pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
+	target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
+	pico_set_boot_stage2(${PROJECT_NAME} slower_boot2)
+	SET(BUILD_NAME "m1p1-${PROJECT_NAME}")
+else()
+    if (m1p2launcher)
+		pico_set_linker_script(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/memmap.ld")
+	endif()
+	SET(BUILD_NAME "m1p2-${PROJECT_NAME}")
+endif()
 
 pico_set_program_name(sms "Sega Master System emulator by xrip for MURMULATOR devboard")
 pico_set_program_version(sms "develop")
@@ -91,7 +112,6 @@ ELSEIF(SOFTTV)
 	target_link_libraries(${PROJECT_NAME} PRIVATE tv-software)
 	SET(BUILD_NAME "${BUILD_NAME}-TV-SOFT")
 ELSE()
-
 	target_compile_definitions(${PROJECT_NAME} PRIVATE VGA)
 	target_link_libraries(${PROJECT_NAME} PRIVATE vga-nextgen)
 	SET(BUILD_NAME "${BUILD_NAME}-VGA")
@@ -99,6 +119,7 @@ ENDIF()
 
 IF(NOT I2S)
 	target_compile_definitions(${PROJECT_NAME} PRIVATE AUDIO_PWM)
+	SET(BUILD_NAME "${BUILD_NAME}-PWM")
 ELSEIF(I2S_CS4334)
 	target_compile_definitions(${PROJECT_NAME} PRIVATE I2S_CS4334)
 	SET(BUILD_NAME "${BUILD_NAME}-I2S-CS4334")
@@ -132,8 +153,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 		tinyusb_host tinyusb_board
 )
 
+#pico_set_linker_script(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/memmap.ld")
 target_link_options(${PROJECT_NAME} PRIVATE -Xlinker --print-memory-usage --data-sections --function-sections)
 pico_add_extra_outputs(${PROJECT_NAME})
-
-
-

@@ -169,7 +169,6 @@ unsigned char *cpu_writemap[8];
 
 int z80_ICount;
 static Z80_Regs Z80;
-Z80_Regs *Z80_Context = &Z80;
 static UINT32 EA;
 int after_EI = 0;
 
@@ -184,6 +183,33 @@ static UINT8 SZHV_dec[256]; /* zero, sign, half carry and overflow flags DEC r8 
 static UINT8 *SZHVC_add = 0;
 static UINT8 *SZHVC_sub = 0;
 #endif
+
+void save_z80(FIL* f) {
+	UINT wb;
+    f_write(f, &Z80, sizeof(Z80_Regs), &wb);
+    f_write(f, &EA, sizeof(EA), &wb);
+    f_write(f, &after_EI, sizeof(int), &wb);
+    f_write(f, SZ, sizeof(SZ), &wb);
+    f_write(f, SZ_BIT, sizeof(SZ_BIT), &wb);
+    f_write(f, SZP, sizeof(SZP), &wb);
+    f_write(f, SZHV_inc, sizeof(SZHV_inc), &wb);
+    f_write(f, SZHV_dec, sizeof(SZHV_dec), &wb);
+    f_write(f, cpu_readmap, sizeof(cpu_readmap), &wb);
+    f_write(f, cpu_writemap, sizeof(cpu_writemap), &wb);
+}
+void load_z80(FIL* f) {
+	UINT rb;
+    f_read(f, &Z80, sizeof(Z80_Regs), &rb);
+    f_read(f, &EA, sizeof(EA), &rb);
+    f_read(f, &after_EI, sizeof(int), &rb);
+    f_read(f, SZ, sizeof(SZ), &rb);
+    f_read(f, SZ_BIT, sizeof(SZ_BIT), &rb);
+    f_read(f, SZP, sizeof(SZP), &rb);
+    f_read(f, SZHV_inc, sizeof(SZHV_inc), &rb);
+    f_read(f, SZHV_dec, sizeof(SZHV_dec), &rb);
+    f_read(f, cpu_readmap, sizeof(cpu_readmap), &rb);
+    f_read(f, cpu_writemap, sizeof(cpu_writemap), &rb);
+}
 
 #if Z80_EXACT
 /* tmp1 value for ini/inir/outi/otir for [C.1-0][io.1-0] */

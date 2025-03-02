@@ -2,6 +2,7 @@
 #include <cstring>
 #include <hardware/flash.h>
 #include <hardware/vreg.h>
+#include <hardware/watchdog.h>
 #include <pico/multicore.h>
 #include <pico/stdlib.h>
 
@@ -33,7 +34,7 @@ bool frameskip = true;
 bool limit_fps = false;
 semaphore vga_start_semaphore;
 
-uint8_t SCREEN[192][256];
+extern "C" uint8_t SCREEN[192][256];
 
 struct input_bits_t {
     bool a: true;
@@ -46,28 +47,48 @@ struct input_bits_t {
     bool down: true;
 };
 
-static input_bits_t keyboard_bits = { false, false, false, false, false, false, false, false };
+static input_bits_t keyboard = { false, false, false, false, false, false, false, false };
 static input_bits_t gamepad1_bits = { false, false, false, false, false, false, false, false };
 static input_bits_t gamepad2_bits = { false, false, false, false, false, false, false, false };
 
-bool swap_ab = false;
+static bool swap_ab = false;
+static FIL file;
+static char pathname[256];
+
+void load_config() {
+    snprintf(pathname, sizeof(pathname), "%s\\emulator.cfg", HOME_DIR);
+    if (FR_OK == f_open(&file, pathname, FA_READ)) {
+        UINT bytes_read;
+        f_read(&file, &swap_ab, sizeof(swap_ab), &bytes_read);
+        f_close(&file);
+    }
+}
+
+void save_config() {
+    snprintf(pathname, sizeof(pathname), "%s\\emulator.cfg", HOME_DIR);
+    if (FR_OK == f_open(&file, pathname, FA_CREATE_ALWAYS | FA_WRITE)) {
+        UINT bytes_writen;
+        f_write(&file, &swap_ab, sizeof(swap_ab), &bytes_writen);
+        f_close(&file);
+    }
+}
 
 void nespad_tick() {
     nespad_read();
 
     if (swap_ab) {
-        gamepad1_bits.a = (nespad_state & DPAD_A) != 0;
-        gamepad1_bits.b = (nespad_state & DPAD_B) != 0;
+        gamepad1_bits.a = keyboard.b || (nespad_state & DPAD_A) != 0;
+        gamepad1_bits.b = keyboard.a || (nespad_state & DPAD_B) != 0;
     } else {
-        gamepad1_bits.b = (nespad_state & DPAD_A) != 0;
-        gamepad1_bits.a = (nespad_state & DPAD_B) != 0;
+        gamepad1_bits.b = keyboard.b || (nespad_state & DPAD_A) != 0;
+        gamepad1_bits.a = keyboard.a || (nespad_state & DPAD_B) != 0;
     }
-    gamepad1_bits.select = (nespad_state & DPAD_SELECT) != 0;
-    gamepad1_bits.start = (nespad_state & DPAD_START) != 0;
-    gamepad1_bits.up = (nespad_state & DPAD_UP) != 0;
-    gamepad1_bits.down = (nespad_state & DPAD_DOWN) != 0;
-    gamepad1_bits.left = (nespad_state & DPAD_LEFT) != 0;
-    gamepad1_bits.right = (nespad_state & DPAD_RIGHT) != 0;
+    gamepad1_bits.select = keyboard.select || (nespad_state & DPAD_SELECT) != 0;
+    gamepad1_bits.start = keyboard.start || (nespad_state & DPAD_START) != 0;
+    gamepad1_bits.up = keyboard.up || (nespad_state & DPAD_UP) != 0;
+    gamepad1_bits.down = keyboard.down || (nespad_state & DPAD_DOWN) != 0;
+    gamepad1_bits.left = keyboard.left || (nespad_state & DPAD_LEFT) != 0;
+    gamepad1_bits.right = keyboard.right || (nespad_state & DPAD_RIGHT) != 0;
 
     int smsButtons = 0;
     int smsSystem = 0;
@@ -78,7 +99,7 @@ void nespad_tick() {
     if (gamepad1_bits.a) smsButtons |= INPUT_BUTTON1;
     if (gamepad1_bits.b) smsButtons |= INPUT_BUTTON2;
     if (gamepad1_bits.start) smsSystem |= INPUT_START;
-    if (gamepad1_bits.select) smsSystem |= INPUT_PAUSE;
+    // if (gamepad1_bits.select) smsSystem |= INPUT_PAUSE;
     // if (gamepad1_bits.down) smsSystem|=INPUT_SOFT_RESET;
     // if (gamepad1_bits.down) smsSystem|=INPUT_HARD_RESET;
     input.pad[0] = smsButtons;
@@ -94,6 +115,10 @@ static bool isInReport(hid_keyboard_report_t const *report, const unsigned char 
     return false;
 }
 
+volatile bool altPressed = false;
+volatile bool ctrlPressed = false;
+volatile uint8_t fxPressedV = 0;
+
 void
 __not_in_flash_func(process_kbd_report)(hid_keyboard_report_t const *report, hid_keyboard_report_t const *prev_report) {
     /* printf("HID key report modifiers %2.2X report ", report->modifier);
@@ -101,14 +126,42 @@ __not_in_flash_func(process_kbd_report)(hid_keyboard_report_t const *report, hid
         printf("%2.2X", i);
     printf("\r\n");
      */
-    keyboard_bits.start = isInReport(report, HID_KEY_ENTER);
-    keyboard_bits.select = isInReport(report, HID_KEY_BACKSPACE);
-    keyboard_bits.a = isInReport(report, HID_KEY_Z);
-    keyboard_bits.b = isInReport(report, HID_KEY_X);
-    keyboard_bits.up = isInReport(report, HID_KEY_ARROW_UP);
-    keyboard_bits.down = isInReport(report, HID_KEY_ARROW_DOWN);
-    keyboard_bits.left = isInReport(report, HID_KEY_ARROW_LEFT);
-    keyboard_bits.right = isInReport(report, HID_KEY_ARROW_RIGHT);
+    keyboard.start = isInReport(report, HID_KEY_ENTER) || isInReport(report, HID_KEY_KEYPAD_ENTER);
+    keyboard.select = isInReport(report, HID_KEY_BACKSPACE) || isInReport(report, HID_KEY_ESCAPE) || isInReport(report, HID_KEY_KEYPAD_ADD);
+    keyboard.a = isInReport(report, HID_KEY_Z) || isInReport(report, HID_KEY_O) || isInReport(report, HID_KEY_KEYPAD_0);
+    keyboard.b = isInReport(report, HID_KEY_X) || isInReport(report, HID_KEY_P) || isInReport(report, HID_KEY_KEYPAD_DECIMAL);
+
+    bool b7 = isInReport(report, HID_KEY_KEYPAD_7);
+    bool b9 = isInReport(report, HID_KEY_KEYPAD_9);
+    bool b1 = isInReport(report, HID_KEY_KEYPAD_1);
+    bool b3 = isInReport(report, HID_KEY_KEYPAD_3);
+
+    keyboard.up = b7 || b9 || isInReport(report, HID_KEY_ARROW_UP) || isInReport(report, HID_KEY_W) || isInReport(report, HID_KEY_KEYPAD_8);
+    keyboard.down = b1 || b3 || isInReport(report, HID_KEY_ARROW_DOWN) || isInReport(report, HID_KEY_S) || isInReport(report, HID_KEY_KEYPAD_2) || isInReport(report, HID_KEY_KEYPAD_5);
+    keyboard.left = b7 || b1 || isInReport(report, HID_KEY_ARROW_LEFT) || isInReport(report, HID_KEY_A) || isInReport(report, HID_KEY_KEYPAD_4);
+    keyboard.right = b9 || b3 || isInReport(report, HID_KEY_ARROW_RIGHT)  || isInReport(report, HID_KEY_D) || isInReport(report, HID_KEY_KEYPAD_6);
+
+    altPressed = isInReport(report, HID_KEY_ALT_LEFT) || isInReport(report, HID_KEY_ALT_RIGHT);
+    ctrlPressed = isInReport(report, HID_KEY_CONTROL_LEFT) || isInReport(report, HID_KEY_CONTROL_RIGHT);
+    
+    if (altPressed && ctrlPressed && isInReport(report, HID_KEY_DELETE)) {
+        watchdog_enable(10, true);
+        while(true) {
+            tight_loop_contents();
+        }
+    }
+    if (ctrlPressed || altPressed) {
+        uint8_t fxPressed = 0;
+        if (isInReport(report, HID_KEY_F1)) fxPressed = 1;
+        else if (isInReport(report, HID_KEY_F2)) fxPressed = 2;
+        else if (isInReport(report, HID_KEY_F3)) fxPressed = 3;
+        else if (isInReport(report, HID_KEY_F4)) fxPressed = 4;
+        else if (isInReport(report, HID_KEY_F5)) fxPressed = 5;
+        else if (isInReport(report, HID_KEY_F6)) fxPressed = 6;
+        else if (isInReport(report, HID_KEY_F7)) fxPressed = 7;
+        else if (isInReport(report, HID_KEY_F8)) fxPressed = 8;
+        fxPressedV = fxPressed;
+    }
     //-------------------------------------------------------------------------
 }
 
@@ -171,7 +224,6 @@ bool isExecutable(const char pathname[255], const char *extensions) {
 
 bool filebrowser_loadfile(const char pathname[256]) {
     UINT bytes_read = 0;
-    FIL file;
 
     constexpr int window_y = (TEXTMODE_ROWS - 5) / 2;
     constexpr int window_x = (TEXTMODE_COLS - 43) / 2;
@@ -236,11 +288,6 @@ void filebrowser(const char pathname[256], const char executables[11]) {
 
     DIR dir;
     FILINFO fileInfo;
-
-    if (FR_OK != f_mount(&fs, "SD", 1)) {
-        draw_text("SD Card not inserted or SD Card error!", 0, 0, 12, 0);
-        while (true);
-    }
 
     while (true) {
         memset(fileItems, 0, sizeof(file_item_t) * max_files);
@@ -309,15 +356,15 @@ void filebrowser(const char pathname[256], const char executables[11]) {
             sleep_ms(100);
 
             if (!debounce) {
-                debounce = !(nespad_state & DPAD_START || keyboard_bits.start);
+                debounce = !(nespad_state & DPAD_START || keyboard.start);
             }
 
             // ESCAPE
-            if (nespad_state & DPAD_SELECT || keyboard_bits.select) {
+            if (nespad_state & DPAD_SELECT || keyboard.select) {
                 return;
             }
 
-            if (nespad_state & DPAD_DOWN || keyboard_bits.down) {
+            if (nespad_state & DPAD_DOWN || keyboard.down) {
                 if (offset + (current_item + 1) < total_files) {
                     if (current_item + 1 < per_page) {
                         current_item++;
@@ -327,7 +374,7 @@ void filebrowser(const char pathname[256], const char executables[11]) {
                 }
             }
 
-            if (nespad_state & DPAD_UP || keyboard_bits.up) {
+            if (nespad_state & DPAD_UP || keyboard.up) {
                 if (current_item > 0) {
                     current_item--;
                 } else if (offset > 0) {
@@ -335,14 +382,14 @@ void filebrowser(const char pathname[256], const char executables[11]) {
                 }
             }
 
-            if (nespad_state & DPAD_RIGHT || keyboard_bits.right) {
+            if (nespad_state & DPAD_RIGHT || keyboard.right) {
                 offset += per_page;
                 if (offset + (current_item + 1) > total_files) {
                     offset = total_files - (current_item + 1);
                 }
             }
 
-            if (nespad_state & DPAD_LEFT || keyboard_bits.left) {
+            if (nespad_state & DPAD_LEFT || keyboard.left) {
                 if (offset > per_page) {
                     offset -= per_page;
                 } else {
@@ -351,7 +398,7 @@ void filebrowser(const char pathname[256], const char executables[11]) {
                 }
             }
 
-            if (debounce && (nespad_state & DPAD_START || keyboard_bits.start)) {
+            if (debounce && (nespad_state & DPAD_START || keyboard.start)) {
                 auto file_at_cursor = fileItems[offset + current_item];
 
                 if (file_at_cursor.is_directory) {
@@ -437,7 +484,7 @@ typedef struct __attribute__((__packed__)) {
 } MenuItem;
 
 int save_slot = 0;
-uint16_t frequencies[] = { 378, 396, 404, 408, 412, 416, 420, 424, 432 };
+uint16_t frequencies[] = { 378, 396, 404, 408, 412, 416, 420, 424, 432, 460 };
 uint8_t frequency_index = 0;
 
 bool overclock() {
@@ -458,42 +505,30 @@ bool overclock() {
 }
 
 bool save() {
-    char pathname[255];
-
     if (save_slot) {
-        sprintf(pathname, "SMS\\%s_%d.save", filename, save_slot);
+        snprintf(pathname, sizeof(pathname), "SMS\\%s_%d.save", filename, save_slot);
     } else {
-        sprintf(pathname, "SMS\\%s.save", filename);
+        snprintf(pathname, sizeof(pathname), "SMS\\%s.save", filename);
     }
-
-    FRESULT fr = f_mount(&fs, "", 1);
-    FIL fd;
-    fr = f_open(&fd, pathname, FA_CREATE_ALWAYS | FA_WRITE);
-    UINT br;
-
-
-    f_close(&fd);
-
+    FRESULT fr = f_open(&file, pathname, FA_CREATE_ALWAYS | FA_WRITE);
+    system_save_state(&file);
+    UINT wb;
+    f_write(&file, &is_gg, sizeof(is_gg), &wb);
+    f_close(&file);
     return true;
 }
 
 bool load() {
-    char pathname[255];
-
     if (save_slot) {
-        sprintf(pathname, "SMS\\%s_%d.save", filename, save_slot);
+        snprintf(pathname, sizeof(pathname), "SMS\\%s_%d.save", filename, save_slot);
     } else {
-        sprintf(pathname, "SMS\\%s.save", filename);
+        snprintf(pathname, sizeof(pathname), "SMS\\%s.save", filename);
     }
-
-    FRESULT fr = f_mount(&fs, "", 1);
-    FIL fd;
-    fr = f_open(&fd, pathname, FA_READ);
-    UINT br;
-
-
-    f_close(&fd);
-
+    FRESULT fr = f_open(&file, pathname, FA_READ);
+    system_load_state(&file);
+    UINT rb;
+    f_read(&file, &is_gg, sizeof(is_gg), &rb);
+    f_close(&file);
     return true;
 }
 
@@ -509,7 +544,7 @@ const MenuItem menu_items[] = {
         {},
         {
           "Overclocking: %s MHz",         ARRAY, &frequency_index, &overclock, count_of(frequencies) - 1,
-                                                                                  { "378", "396", "404", "408", "412", "416", "420", "424", "432" }
+                                        { "378", "396", "404", "408", "412", "416", "420", "424", "432", "460" }
         },
         { "Press START / Enter to apply", NONE },
         { "Reset to ROM select",          ROM_SELECT },
@@ -527,6 +562,7 @@ void menu() {
              __TIME__);
     draw_text(footer, TEXTMODE_COLS / 2 - strlen(footer) / 2, TEXTMODE_ROWS - 1, 11, 1);
     uint current_item = 0;
+    uint64_t time = time_us_64();
 
     while (!exit) {
         for (int i = 0; i < MENU_ITEMS_NUMBER; i++) {
@@ -545,22 +581,23 @@ void menu() {
                     case ARRAY:
                         if (item->max_value != 0) {
                             auto *value = (uint8_t *) item->value;
-                            if ((gamepad1_bits.right || keyboard_bits.right) && *value < item->max_value) {
+                            if ((gamepad1_bits.right || keyboard.right) && *value < item->max_value) {
                                 (*value)++;
                             }
-                            if ((gamepad1_bits.left || keyboard_bits.left) && *value > 0) {
+                            if ((gamepad1_bits.left || keyboard.left) && *value > 0) {
                                 (*value)--;
                             }
                         }
                         break;
                     case RETURN:
-                        if (gamepad1_bits.start || keyboard_bits.start)
+                        if (gamepad1_bits.start || keyboard.start)
                             exit = true;
                         break;
 
                     case ROM_SELECT:
-                        if (gamepad1_bits.start || keyboard_bits.start) {
+                        if (gamepad1_bits.start || keyboard.start) {
                             reboot = true;
+                            save_config();
                             return;
                         }
                         break;
@@ -568,7 +605,7 @@ void menu() {
                         break;
                 }
 
-                if (nullptr != item->callback && (gamepad1_bits.start || keyboard_bits.start)) {
+                if (nullptr != item->callback && (gamepad1_bits.start || keyboard.start)) {
                     exit = item->callback();
                 }
             }
@@ -591,23 +628,25 @@ void menu() {
             draw_text(result, x, y, color, bg_color);
         }
 
-        if (gamepad1_bits.down || keyboard_bits.down) {
+        if (gamepad1_bits.down || keyboard.down) {
             current_item = (current_item + 1) % MENU_ITEMS_NUMBER;
 
             if (menu_items[current_item].type == NONE)
                 current_item++;
         }
-        if (gamepad1_bits.up || keyboard_bits.up) {
+        if (gamepad1_bits.up || keyboard.up) {
             current_item = (current_item - 1 + MENU_ITEMS_NUMBER) % MENU_ITEMS_NUMBER;
 
             if (menu_items[current_item].type == NONE)
                 current_item--;
         }
+        if (time_us_64() - time > 500 && gamepad1_bits.select && !gamepad1_bits.start)
+            break;
 
         sleep_ms(125);
     }
-
-    graphics_set_mode(GRAPHICSMODE_DEFAULT);
+    save_config();
+    graphics_set_mode(is_gg ? GG_160x144 : GRAPHICSMODE_DEFAULT);
 }
 
 /* Renderer loop on Pico's second core */
@@ -623,7 +662,7 @@ void __time_critical_func(render_core)() {
     graphics_set_buffer(buffer, BMP_WIDTH, BMP_HEIGHT);
     graphics_set_textbuffer(buffer);
     graphics_set_bgcolor(0x000000);
-    graphics_set_offset(32, 24);
+    graphics_set_offset(0, 24);
 
     graphics_set_flashmode(false, false);
     sem_acquire_blocking(&vga_start_semaphore);
@@ -664,6 +703,9 @@ void system_load_sram(void) {
 static int audio_buffer[AUDIO_FREQ / 60];
 
 int main() {
+    f_mount(&fs, "SD", 1);
+    load_config();
+
     overclock();
 
     sem_init(&vga_start_semaphore, 0, 1);
@@ -708,7 +750,7 @@ int main() {
         graphics_set_mode(TEXTMODE_DEFAULT);
         filebrowser(HOME_DIR, "sms,gg");
         graphics_set_mode(is_gg ? GG_160x144 : GRAPHICSMODE_DEFAULT);
-        graphics_set_offset(is_gg ? 40 : 16, 24);
+        graphics_set_offset(0/*is_gg ? 40 : 16*/, 24);
         emu_system_init(AUDIO_FREQ);
         cart.type = is_gg ? TYPE_GG : TYPE_SMS;
         cart.pages = rom_size / 0x4000;
@@ -721,10 +763,18 @@ int main() {
             // for(int x = 0; x <64; x++) graphics_set_palette(x, RGB888(bitmap.pal.color[x][0], bitmap.pal.color[x][1], bitmap.pal.color[x][2]));
 
 
-            if ((gamepad1_bits.start && gamepad1_bits.select) || (keyboard_bits.start && keyboard_bits.select)) {
+            if (gamepad1_bits.start && gamepad1_bits.select) {
                 menu();
             }
-
+            if (fxPressedV) {
+                if (altPressed) {
+                    save_slot = fxPressedV;
+                    load();
+                } else if (ctrlPressed) {
+                    save_slot = fxPressedV;
+                    save();
+                }
+            }
 
             frame++;
             if (limit_fps) {

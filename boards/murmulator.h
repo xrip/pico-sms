@@ -39,6 +39,9 @@
 // Sound
 #if defined(AUDIO_PWM)
 #define AUDIO_PWM_PIN 26
+/// TODO: remove it
+#define AUDIO_DATA_PIN 26
+#define AUDIO_CLOCK_PIN 27
 #else
 // I2S Sound
 #define AUDIO_DATA_PIN 26

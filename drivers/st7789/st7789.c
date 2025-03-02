@@ -249,14 +249,28 @@ void __inline __scratch_y("refresh_lcd") refresh_lcd() {
             break;
         case GRAPHICSMODE_DEFAULT: {
             const uint8_t* bitmap = graphics_buffer;
-            lcd_set_window(graphics_buffer_shift_x, graphics_buffer_shift_y, graphics_buffer_width,
-                           graphics_buffer_height);
-            uint32_t i = graphics_buffer_width * graphics_buffer_height;
+            lcd_set_window(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
             start_pixels();
-            // st7789_dma_pixels(graphics_buffer, i);
-            while (--i) {
-               st7789_lcd_put_pixel(pio, sm, palette[*bitmap++ & 0x1F]);
+            const uint8_t c0 = palette[0];
+            for (uint32_t y = 0; y < SCREEN_HEIGHT; ++y) {
+                if (y < 24 || y >= 216) {
+                    for (uint32_t x = 0; x < SCREEN_WIDTH; ++x) {
+                        st7789_lcd_put_pixel(pio, sm, c0);
+                    }
+                    continue;
+                }
+                y -= 24;
+                for (int i = (SCREEN_WIDTH - 256) >> 1; i;) {
+                    st7789_lcd_put_pixel(pio, sm, c0);
+                }
+                for (int x = 0; x < 256; ++x) {
+                    st7789_lcd_put_pixel(pio, sm, palette[*bitmap++ & 0x1F]);
+                }
+                for (int i = (SCREEN_WIDTH - 256) >> 1; i--;) {
+                    st7789_lcd_put_pixel(pio, sm, c0);
+                }
             }
+            // st7789_dma_pixels(graphics_buffer, i);
             stop_pixels();
         }
     }
