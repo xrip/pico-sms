@@ -649,6 +649,7 @@ void menu() {
     }
     save_config();
     graphics_set_mode(is_gg ? ( gg2x ? GG_160x144x4x3 : GG_160x144 ) : GRAPHICSMODE_DEFAULT);
+    graphics_set_offset(0, is_gg && gg2x ? -16 : 24);
 }
 
 /* Renderer loop on Pico's second core */

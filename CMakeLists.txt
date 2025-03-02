@@ -14,8 +14,8 @@ endif()
 # ====================================================================================
 cmake_minimum_required(VERSION 3.13)
 set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards )
-set(PICO_PLATFORM "rp2350" CACHE STRING "Chip type")
-#set(PICO_PLATFORM "rp2040" CACHE STRING "Chip type")
+#set(PICO_PLATFORM "rp2350" CACHE STRING "Chip type")
+set(PICO_PLATFORM "rp2040" CACHE STRING "Chip type")
 set(PICO_BOARD "murmulator" CACHE STRING "Board type")
 include(pico_sdk_import.cmake)
 
@@ -33,8 +33,8 @@ if( ${PICO_PLATFORM} MATCHES "rp2350" )
 option(m1p2launcher "Enable m1p2-launcher support" OFF)
 endif()
 
-set(I2S ON)
-set(HDMI ON)
+#set(I2S ON)
+#set(HDMI ON)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
