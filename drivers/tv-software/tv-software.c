@@ -1014,9 +1014,11 @@ static bool __time_critical_func(video_timer_callbackTV)(repeating_timer_t* rt) 
                         }
                         break;
                         case GRAPHICSMODE_DEFAULT: {
+                            graphics_buffer.shift_x = (320 - graphics_buffer.width) >> 1;
+                            uint8_t c0 = 0; // 200
                             if (y < graphics_buffer.shift_y || y >= graphics_buffer.height+graphics_buffer.shift_y) {
                                 for (int i = 0; i < video_mode.img_W - d_end; i++) {
-                                    uint32_t cout32 = conv_color[li][200];
+                                    uint32_t cout32 = conv_color[li][c0];
                                     uint8_t* c_4 = (uint8_t*)&cout32;
                                     *output_buffer8++ = c_4[i % 4];
                                 }
@@ -1025,12 +1027,11 @@ static bool __time_critical_func(video_timer_callbackTV)(repeating_timer_t* rt) 
                                 uint8_t* input_buffer8 = input_buffer + (y-graphics_buffer.shift_y) * graphics_buffer.width;
 
                                 // todo bgcolor
-                                uint8_t color = graphics_buffer.shift_x ? 200 : *input_buffer8++;
+                                uint8_t color = graphics_buffer.shift_x ? c0 : *input_buffer8++;
                                 uint32_t cout32 = conv_color[li][color];
                                 // uint8_t* c_4=&conv_color[0][c8&0xf];
                                 uint8_t* c_4 = (uint8_t*)&cout32;
                                 output_buffer8 += buffer_shift;
-
 
                                 int x = 0;
 
@@ -1039,13 +1040,50 @@ static bool __time_critical_func(video_timer_callbackTV)(repeating_timer_t* rt) 
                                     next_ibuf -= di;
                                     if (next_ibuf <= 0) {
                                         x++;
-                                        if (x > graphics_buffer.shift_x && x < graphics_buffer.shift_x + graphics_buffer.
-                                            width) {
+                                        if (x > graphics_buffer.shift_x && x < graphics_buffer.shift_x + graphics_buffer.width) {
                                             color = *input_buffer8++;
                                             }
                                         else {
-                                            color = 200;
+                                            color = c0; //200;
                                         }
+                                        cout32 = conv_color[li][color];
+                                        next_ibuf += 0x100;
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                        case GG_160x144: {
+                            graphics_buffer.shift_x = (320 - 160) >> 1;
+                            uint8_t c0 = 0; // 200
+                            if (y < graphics_buffer.shift_y || y >= graphics_buffer.height+graphics_buffer.shift_y) {
+                                for (int i = 0; i < video_mode.img_W - d_end; i++) {
+                                    uint32_t cout32 = conv_color[li][c0];
+                                    uint8_t* c_4 = (uint8_t*)&cout32;
+                                    *output_buffer8++ = c_4[i % 4];
+                                }
+                            } else {
+                                //для 8-битного буфера
+                                uint8_t* input_buffer8 = 48 + input_buffer + (y-graphics_buffer.shift_y) * graphics_buffer.width;
+
+                                // todo bgcolor
+                                uint8_t color = graphics_buffer.shift_x ? c0 : *input_buffer8++;
+                                uint32_t cout32 = conv_color[li][color];
+                                // uint8_t* c_4=&conv_color[0][c8&0xf];
+                                uint8_t* c_4 = (uint8_t*)&cout32;
+                                output_buffer8 += buffer_shift;
+
+                                int x = 0;
+
+                                for (int i = 0; i < video_mode.img_W - d_end; i++) {
+                                    *output_buffer8++ = c_4[i % 4];
+                                    next_ibuf -= di;
+                                    if (next_ibuf <= 0) {
+                                        x++;
+                                        if (x > graphics_buffer.shift_x && x < graphics_buffer.shift_x + 160)
+                                            color = *input_buffer8++;
+                                        else
+                                            color = c0; // 200;
                                         cout32 = conv_color[li][color];
                                         next_ibuf += 0x100;
                                     }
