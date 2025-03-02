@@ -117,6 +117,11 @@ void __time_critical_func() dma_handler_VGA() {
         case CGA_640x200x2:
         case TGA_320x200x16:
         case EGA_320x200x16x4:
+        case GG_160x144x4x3:
+            line_number = screen_line / 3;
+            if (screen_line % 3) return;
+            y = line_number - graphics_buffer_shift_y;
+            break;
         case GG_160x144:
         case GRAPHICSMODE_DEFAULT:
             line_number = screen_line / 2;
@@ -337,6 +342,14 @@ void __time_critical_func() dma_handler_VGA() {
             }
             break;
         }
+        case GG_160x144x4x3:
+            input_buffer_8bit = 48 + input_buffer + y * width;
+            for (int i = 160; i--;) {
+                uint16_t c = current_palette[*input_buffer_8bit++ & 0x1F];
+                *output_buffer_16bit++ = c;
+                *output_buffer_16bit++ = c;
+            }
+            break;
         default:
             break;
     }
@@ -400,6 +413,7 @@ void graphics_set_mode(enum graphics_mode_t mode) {
         case CGA_160x200x16:
         case GRAPHICSMODE_DEFAULT:
         case GG_160x144:
+        case GG_160x144x4x3:
         case EGA_320x200x16x4:
         case TGA_320x200x16:
 

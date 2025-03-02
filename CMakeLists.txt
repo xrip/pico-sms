@@ -33,6 +33,8 @@ if( ${PICO_PLATFORM} MATCHES "rp2350" )
 option(m1p2launcher "Enable m1p2-launcher support" OFF)
 endif()
 
+set(I2S ON)
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 #add_compile_options(-flto)
