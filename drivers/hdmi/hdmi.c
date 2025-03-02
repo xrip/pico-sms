@@ -187,6 +187,35 @@ static void __scratch_y("hdmi_driver") dma_handler_HDMI() {
         int y = line / 2;
         uint8_t c0 = 0;
         switch (graphics_mode) {
+            case GG_160x144x4x3: {
+                int y = line / 3;
+                graphics_buffer_shift_x = 0;
+            //заполняем пространство сверху и снизу графического буфера
+                if (false || (graphics_buffer_shift_y > y) || (y >= (graphics_buffer_shift_y + graphics_buffer_height))) {
+                    memset(output_buffer, c0, SCREEN_WIDTH);
+                    break;
+                }
+
+                uint8_t* activ_buf_end = output_buffer + SCREEN_WIDTH;
+    
+            //рисуем сам видеобуфер+пространство справа
+                input_buffer = 48 + graphics_buffer + (y - graphics_buffer_shift_y) * graphics_buffer_width;
+
+                const uint8_t* input_buffer_end = input_buffer + graphics_buffer_width;
+
+                while (activ_buf_end > output_buffer) {
+                    if (input_buffer < input_buffer_end) {
+                        uint8_t i_color = *input_buffer++ & 0x1F;
+                        i_color = ((i_color & 0xf0) == 0xf0) ? 255 : i_color;
+                        *output_buffer++ = i_color;
+                        *output_buffer++ = i_color;
+                    }
+                    else
+                        *output_buffer++ = c0;
+                }
+
+                break;
+            }
             case GG_160x144: {
                 graphics_buffer_shift_x = (320 - 160) >> 1;
             //заполняем пространство сверху и снизу графического буфера
