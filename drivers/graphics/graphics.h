@@ -43,6 +43,7 @@ enum graphics_mode_t {
     EGA_320x200x16x4,
     VGA_320x240x256,
     GG_160x144,
+    GG_160x144x4x3,
     // planar VGA
 };
 

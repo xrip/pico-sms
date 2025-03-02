@@ -30,7 +30,6 @@ static size_t __uninitialized_ram(rom_size)
 
 static FATFS fs;
 bool reboot = false;
-bool frameskip = true;
 bool limit_fps = false;
 semaphore vga_start_semaphore;
 
@@ -52,6 +51,7 @@ static input_bits_t gamepad1_bits = { false, false, false, false, false, false, 
 static input_bits_t gamepad2_bits = { false, false, false, false, false, false, false, false };
 
 static bool swap_ab = false;
+static bool gg2x = false;
 static FIL file;
 static char pathname[256];
 
@@ -60,6 +60,7 @@ void load_config() {
     if (FR_OK == f_open(&file, pathname, FA_READ)) {
         UINT bytes_read;
         f_read(&file, &swap_ab, sizeof(swap_ab), &bytes_read);
+        f_read(&file, &gg2x, sizeof(gg2x), &bytes_read);
         f_close(&file);
     }
 }
@@ -69,6 +70,7 @@ void save_config() {
     if (FR_OK == f_open(&file, pathname, FA_CREATE_ALWAYS | FA_WRITE)) {
         UINT bytes_writen;
         f_write(&file, &swap_ab, sizeof(swap_ab), &bytes_writen);
+        f_write(&file, &gg2x, sizeof(gg2x), &bytes_writen);
         f_close(&file);
     }
 }
@@ -535,7 +537,7 @@ bool load() {
 
 const MenuItem menu_items[] = {
         { "Swap AB <> BA: %s",            ARRAY, &swap_ab,         nullptr,    1, { "NO ", "YES" }},
-        { "Frameskip: %s",                ARRAY, &frameskip,       nullptr,    1, { "YES", "NO " }},
+        { "GG 2x: %s",                    ARRAY, &gg2x,            nullptr,    1, { "NO ", "YES" }},
         //{ "Player 1: %s",        ARRAY, &player_1_input, 2, { "Keyboard ", "Gamepad 1", "Gamepad 2" }},
         //{ "Player 2: %s",        ARRAY, &player_2_input, 2, { "Keyboard ", "Gamepad 1", "Gamepad 2" }},
         {},
@@ -646,7 +648,8 @@ void menu() {
         sleep_ms(125);
     }
     save_config();
-    graphics_set_mode(is_gg ? GG_160x144 : GRAPHICSMODE_DEFAULT);
+    graphics_set_mode(is_gg ? ( gg2x ? GG_160x144x4x3 : GG_160x144 ) : GRAPHICSMODE_DEFAULT);
+    graphics_set_offset(0, is_gg && gg2x ? -16 : 24);
 }
 
 /* Renderer loop on Pico's second core */
@@ -662,7 +665,7 @@ void __time_critical_func(render_core)() {
     graphics_set_buffer(buffer, BMP_WIDTH, BMP_HEIGHT);
     graphics_set_textbuffer(buffer);
     graphics_set_bgcolor(0x000000);
-    graphics_set_offset(0, 24);
+    graphics_set_offset(0, is_gg && gg2x ? -16 : 24);
 
     graphics_set_flashmode(false, false);
     sem_acquire_blocking(&vga_start_semaphore);
@@ -749,8 +752,8 @@ int main() {
 
         graphics_set_mode(TEXTMODE_DEFAULT);
         filebrowser(HOME_DIR, "sms,gg");
-        graphics_set_mode(is_gg ? GG_160x144 : GRAPHICSMODE_DEFAULT);
-        graphics_set_offset(0/*is_gg ? 40 : 16*/, 24);
+        graphics_set_mode(is_gg ? ( gg2x ? GG_160x144x4x3 : GG_160x144 ) : GRAPHICSMODE_DEFAULT);
+        graphics_set_offset(0, is_gg && gg2x ? -16 : 24);
         emu_system_init(AUDIO_FREQ);
         cart.type = is_gg ? TYPE_GG : TYPE_SMS;
         cart.pages = rom_size / 0x4000;
