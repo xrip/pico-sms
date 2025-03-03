@@ -938,7 +938,7 @@ static bool __time_critical_func(video_timer_callbackTV)(repeating_timer_t* rt) 
                                 uint8_t* input_buffer8 = input_buffer + (y-graphics_buffer.shift_y) * graphics_buffer.width;
 
                                 // todo bgcolor
-                                uint8_t color = graphics_buffer.shift_x ? c0 : *input_buffer8++;
+                                uint8_t color = graphics_buffer.shift_x ? c0 : *input_buffer8++ & 0x1F;
                                 uint32_t cout32 = conv_color[li][color];
                                 uint8_t* c_4 = (uint8_t*)&cout32;
                                 output_buffer8 += buffer_shift;
@@ -951,7 +951,7 @@ static bool __time_critical_func(video_timer_callbackTV)(repeating_timer_t* rt) 
                                     if (next_ibuf <= 0) {
                                         x++;
                                         if (x > graphics_buffer.shift_x && x < graphics_buffer.shift_x + graphics_buffer.width) {
-                                            color = *input_buffer8++;
+                                            color = *input_buffer8++  & 0x1F;
                                             }
                                         else {
                                             color = c0; //200;
@@ -990,7 +990,7 @@ static bool __time_critical_func(video_timer_callbackTV)(repeating_timer_t* rt) 
                                     if (next_ibuf <= 0) {
                                         x++;
                                         if (x > graphics_buffer.shift_x && x < graphics_buffer.shift_x + 160)
-                                            color = *input_buffer8++;
+                                            color = *input_buffer8++  & 0x1F;
                                         else
                                             color = c0; // 200;
                                         cout32 = conv_color[li][color];
@@ -1013,7 +1013,7 @@ static bool __time_critical_func(video_timer_callbackTV)(repeating_timer_t* rt) 
                                 //для 8-битного буфера
                                 uint8_t* input_buffer8 = 48 + input_buffer + (y-graphics_buffer.shift_y) * graphics_buffer.width;
 
-                                uint8_t color = *input_buffer8++;
+                                uint8_t color = *input_buffer8++ & 0x1F;
                                 uint32_t cout32 = conv_color[li][color];
                                 uint8_t* c_4 = (uint8_t*)&cout32;
                                 output_buffer8 += buffer_shift;
@@ -1026,7 +1026,7 @@ static bool __time_critical_func(video_timer_callbackTV)(repeating_timer_t* rt) 
                                     next_ibuf -= di;
                                     if (next_ibuf <= 0) {
                                         x++;
-                                        color = *input_buffer8++;
+                                        color = *input_buffer8++ & 0x1F;
                                         cout32 = conv_color[li][color];
                                         next_ibuf += 0x100;
                                     }
