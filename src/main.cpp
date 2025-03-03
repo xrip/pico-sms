@@ -27,6 +27,7 @@ bool __uninitialized_ram(is_gg)
 char __uninitialized_ram(filename[256]);
 static size_t __uninitialized_ram(rom_size)
 = 0;
+static int by = 0;
 
 static FATFS fs;
 bool reboot = false;
@@ -61,6 +62,7 @@ void load_config() {
         UINT bytes_read;
         f_read(&file, &swap_ab, sizeof(swap_ab), &bytes_read);
         f_read(&file, &gg2x, sizeof(gg2x), &bytes_read);
+        f_read(&file, &by, sizeof(by), &bytes_read);
         f_close(&file);
     }
 }
@@ -71,6 +73,7 @@ void save_config() {
         UINT bytes_writen;
         f_write(&file, &swap_ab, sizeof(swap_ab), &bytes_writen);
         f_write(&file, &gg2x, sizeof(gg2x), &bytes_writen);
+        f_write(&file, &by, sizeof(by), &bytes_writen);
         f_close(&file);
     }
 }
@@ -106,6 +109,17 @@ void nespad_tick() {
     // if (gamepad1_bits.down) smsSystem|=INPUT_HARD_RESET;
     input.pad[0] = smsButtons;
     input.system = smsSystem;
+
+    if (gamepad1_bits.select && gamepad1_bits.up) {
+        --by;
+        graphics_set_offset(0, by + (is_gg && gg2x ? -16 : 24));
+        sleep_ms(100);
+    }
+    if (gamepad1_bits.select && gamepad1_bits.down) {
+        ++by;
+        graphics_set_offset(0, by + (is_gg && gg2x ? -16 : 24));
+        sleep_ms(100);
+    }
 }
 
 static bool isInReport(hid_keyboard_report_t const *report, const unsigned char keycode) {
@@ -649,7 +663,7 @@ void menu() {
     }
     save_config();
     graphics_set_mode(is_gg ? ( gg2x ? GG_160x144x4x3 : GG_160x144 ) : GRAPHICSMODE_DEFAULT);
-    graphics_set_offset(0, is_gg && gg2x ? -16 : 24);
+    graphics_set_offset(0, by + (is_gg && gg2x ? -16 : 24));
 }
 
 /* Renderer loop on Pico's second core */
@@ -665,7 +679,7 @@ void __time_critical_func(render_core)() {
     graphics_set_buffer(buffer, BMP_WIDTH, BMP_HEIGHT);
     graphics_set_textbuffer(buffer);
     graphics_set_bgcolor(0x000000);
-    graphics_set_offset(0, is_gg && gg2x ? -16 : 24);
+    graphics_set_offset(0, by + (is_gg && gg2x ? -16 : 24));
 
     graphics_set_flashmode(false, false);
     sem_acquire_blocking(&vga_start_semaphore);
@@ -753,7 +767,7 @@ int main() {
         graphics_set_mode(TEXTMODE_DEFAULT);
         filebrowser(HOME_DIR, "sms,gg");
         graphics_set_mode(is_gg ? ( gg2x ? GG_160x144x4x3 : GG_160x144 ) : GRAPHICSMODE_DEFAULT);
-        graphics_set_offset(0, is_gg && gg2x ? -16 : 24);
+        graphics_set_offset(0, by + (is_gg && gg2x ? -16 : 24));
         emu_system_init(AUDIO_FREQ);
         cart.type = is_gg ? TYPE_GG : TYPE_SMS;
         cart.pages = rom_size / 0x4000;
