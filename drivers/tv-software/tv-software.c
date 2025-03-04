@@ -966,7 +966,7 @@ static bool __time_critical_func(video_timer_callbackTV)(repeating_timer_t* rt) 
                         case GG_160x144: {
                             graphics_buffer.shift_x = (320 - 160) >> 1;
                             uint8_t c0 = 0; // 200
-                            if (y < graphics_buffer.shift_y || y >= graphics_buffer.height+graphics_buffer.shift_y) {
+                            if (y < graphics_buffer.shift_y || y >= graphics_buffer.height + graphics_buffer.shift_y) {
                                 for (int i = 0; i < video_mode.img_W - d_end; i++) {
                                     uint32_t cout32 = conv_color[li][c0];
                                     uint8_t* c_4 = (uint8_t*)&cout32;
@@ -974,10 +974,10 @@ static bool __time_critical_func(video_timer_callbackTV)(repeating_timer_t* rt) 
                                 }
                             } else {
                                 //для 8-битного буфера
-                                uint8_t* input_buffer8 = 48 + input_buffer + (y-graphics_buffer.shift_y) * graphics_buffer.width;
+                                uint8_t* input_buffer8 = 48 + input_buffer + (y - graphics_buffer.shift_y) * graphics_buffer.width;
 
                                 // todo bgcolor
-                                uint8_t color = graphics_buffer.shift_x ? c0 : *input_buffer8++;
+                                uint8_t color = graphics_buffer.shift_x ? c0 : *input_buffer8++ & 0x1F;
                                 uint32_t cout32 = conv_color[li][color];
                                 uint8_t* c_4 = (uint8_t*)&cout32;
                                 output_buffer8 += buffer_shift;
@@ -1003,7 +1003,8 @@ static bool __time_critical_func(video_timer_callbackTV)(repeating_timer_t* rt) 
                         case GG_160x144x4x3: {
                             graphics_buffer.shift_x = 0;
                             uint8_t c0 = 0; // 200
-                            if (y < graphics_buffer.shift_y || y >= graphics_buffer.height+graphics_buffer.shift_y) {
+                            y = (y << 1) / 3;
+                            if (y < graphics_buffer.shift_y || y >= graphics_buffer.height + graphics_buffer.shift_y) {
                                 for (int i = 0; i < video_mode.img_W - d_end; i++) {
                                     uint32_t cout32 = conv_color[li][c0];
                                     uint8_t* c_4 = (uint8_t*)&cout32;
@@ -1011,7 +1012,7 @@ static bool __time_critical_func(video_timer_callbackTV)(repeating_timer_t* rt) 
                                 }
                             } else {
                                 //для 8-битного буфера
-                                uint8_t* input_buffer8 = 48 + input_buffer + (y-graphics_buffer.shift_y) * graphics_buffer.width;
+                                uint8_t* input_buffer8 = 48 + input_buffer + (y - graphics_buffer.shift_y) * graphics_buffer.width;
 
                                 uint8_t color = *input_buffer8++ & 0x1F;
                                 uint32_t cout32 = conv_color[li][color];
