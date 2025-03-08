@@ -164,7 +164,7 @@ void SN76496Update(int chip,INT16 *buffer[2],int length, unsigned char mask)
         out[0] = out[1] = 0;
         for(j = 0; j < 4; j += 1)
         {
-            int k = vol[j] * R->Volume[j];
+            int k = vol[j] * R->Volume[j] / 2; // чуток тише, чтобы без перегрузок звучало
             if(mask & (1 << (4+j))) out[0] += k;
             if(mask & (1 << (0+j))) out[1] += k;
         }
