@@ -14,8 +14,9 @@ endif()
 # ====================================================================================
 cmake_minimum_required(VERSION 3.13)
 set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards )
-set(PICO_PLATFORM "rp2350" CACHE STRING "Chip type")
-#set(PICO_PLATFORM "rp2040" CACHE STRING "Chip type")
+#set(PICO_PLATFORM "rp2350" CACHE STRING "Chip type")
+set(PICO_PLATFORM "rp2040" CACHE STRING "Chip type")
+#set(PICO_BOARD "murmulator" CACHE STRING "Board type")
 set(PICO_BOARD "murmulator2" CACHE STRING "Board type")
 include(pico_sdk_import.cmake)
 
@@ -33,7 +34,9 @@ if( ${PICO_PLATFORM} MATCHES "rp2350" )
 option(m1p2launcher "Enable m1p2-launcher support" OFF)
 endif()
 
+#set (m1p2launcher ON)
 set(I2S ON)
+set(HDMI ON)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -94,8 +97,12 @@ else()
 	endif()
 endif()
 
-pico_set_program_name(sms "Sega Master System emulator by xrip for MURMULATOR devboard")
-pico_set_program_version(sms "develop")
+if ( ${PICO_BOARD} MATCHES "murmulator2")
+pico_set_program_name(sms "Sega Master System emulator by xrip for MURMULATOR 2.0 board")
+else()
+pico_set_program_name(sms "Sega Master System emulator by xrip for MURMULATOR 1.x board")
+endif()
+pico_set_program_version(sms "2.1.3")
 
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 
