@@ -5,8 +5,10 @@
 
 #include <stdbool.h>
 
-#define KBD_CLOCK_PIN    (0)
-#define KBD_DATA_PIN    (1)
+#ifndef KBD_CLOCK_PIN
+#define KBD_CLOCK_PIN   (PS2KBD_GPIO_FIRST)
+#define KBD_DATA_PIN    (PS2KBD_GPIO_FIRST+1)
+#endif
 #define KBD_BUFFER_SIZE 16
 
 #define PS2_LED_SCROLL_LOCK 1
